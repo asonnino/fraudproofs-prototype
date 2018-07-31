@@ -1,2 +1,2 @@
-# fraudproof-prototype
-Prototype of fraud proof.
+# fraudproofs-prototype
+Prototype of fraud proofs.
