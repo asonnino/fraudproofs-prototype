@@ -1,4 +1,4 @@
-package main
+package fraudproofs_prototype
 
 import "github.com/NebulousLabs/merkletree"
 import "crypto/sha256"
@@ -66,7 +66,7 @@ func (b *Block) RootTransition(prevState []byte, t Transaction, w [][]byte) []by
 	// TODO
 	// test
 
-	
+
 	key := hash([]byte("non-member"))
 	//key := t.data[0] // has to be 32 bytes
 	ap := b.stateTree.AuditPath(D(t.data[0]), b.stateTree.N, b.stateTree.Base, key)

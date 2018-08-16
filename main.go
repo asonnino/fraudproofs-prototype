@@ -1,4 +1,4 @@
-package main
+package fraudproofs_prototype
 
 import "fmt"
 //import "github.com/davecgh/go-spew/spew"

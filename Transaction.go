@@ -1,4 +1,4 @@
-package main
+package fraudproofs_prototype
 
 import "errors"
 
