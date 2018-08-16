@@ -8,7 +8,7 @@ import "sort"
 
 
 
-func hash(data ...[]byte) []byte {
+func Hash(data ...[]byte) []byte {
 	hasher := sha512.New512_256()
 	for i := 0; i < len(data); i++ {
 		hasher.Write(data[i])
@@ -25,7 +25,7 @@ func getFreshData(size int) gosmt.D {
 		if err != nil {
 			panic(err)
 		}
-		data = append(data, hash(key))
+		data = append(data, Hash(key))
 	}
 	sort.Sort(gosmt.D(data))
 	return data

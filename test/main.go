@@ -1,6 +1,9 @@
-package fraudproofs_prototype
+package main
 
-import "fmt"
+import (
+	"fmt"
+	. "github.com/asonnino/fraudproofs_prototype"
+)
 //import "github.com/davecgh/go-spew/spew"
 
 
@@ -11,7 +14,7 @@ import "fmt"
 
 func main() {
 
-	data := append([][]byte{},hash([]byte{10,10,10}))
+	data := append([][]byte{},Hash([]byte{10,10,10}))
 	keys := append([][]byte{},data[0]) // same as the data? gosmt seems to generate keys on its own
 	t1, err := NewTransaction(keys, data)
 	t2, err := NewTransaction(keys, data)

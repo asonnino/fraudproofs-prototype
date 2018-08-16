@@ -32,7 +32,7 @@ func NewBlock() *Block {
         nil,
         0,
         merkletree.New(sha256.New()),
-        gosmt.NewSMT([]byte{TreeWideConstant}, gosmt.CacheNothing(1), hash), // naive caching strategy
+        gosmt.NewSMT([]byte{TreeWideConstant}, gosmt.CacheNothing(1), Hash), // naive caching strategy
         [][]byte{}}
 }
 
@@ -67,7 +67,7 @@ func (b *Block) RootTransition(prevState []byte, t Transaction, w [][]byte) []by
 	// test
 
 
-	key := hash([]byte("non-member"))
+	key := Hash([]byte("non-member"))
 	//key := t.data[0] // has to be 32 bytes
 	ap := b.stateTree.AuditPath(D(t.data[0]), b.stateTree.N, b.stateTree.Base, key)
 	fmt.Println(b.stateTree.VerifyAuditPath(ap, key, gosmt.Empty, b.stateRoot))
