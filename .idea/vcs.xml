@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="VcsDirectoryMappings">
+    <mapping directory="$PROJECT_DIR$" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/github.com/NebulousLabs/errors" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/github.com/NebulousLabs/fastrand" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/github.com/NebulousLabs/merkletree" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/github.com/davecgh/go-spew" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/github.com/go-spew" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/github.com/pylls/gosmt" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/golang.org/x/crypto" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/golang.org/x/sys" vcs="Git" />
+  </component>
+</project>
