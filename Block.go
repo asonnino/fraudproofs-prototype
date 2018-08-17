@@ -2,9 +2,9 @@ package fraudproofs_prototype
 
 import "github.com/NebulousLabs/merkletree"
 import "crypto/sha256"
-import "github.com/pylls/gosmt"
-import "fmt"
-
+import (
+	"github.com/pylls/gosmt"
+)
 
 const Step int = 2
 const ChunksSize int = 256
@@ -32,7 +32,7 @@ func NewBlock() *Block {
         nil,
         0,
         merkletree.New(sha256.New()),
-        gosmt.NewSMT([]byte{TreeWideConstant}, gosmt.CacheNothing(1), Hash), // naive caching strategy
+        gosmt.NewSMT([]byte{TreeWideConstant}, gosmt.CacheNothing(1), Hash), // no caching
         [][]byte{}}
 }
 
@@ -62,15 +62,32 @@ func (b *Block) AddTransaction(t Transaction) {
 	b.dataRoot = b.dataTree.Root()
 }
 
-func (b *Block) RootTransition(prevState []byte, t Transaction, w [][]byte) []byte {
-	// TODO
-	// test
-
-
-	key := Hash([]byte("non-member"))
-	//key := t.data[0] // has to be 32 bytes
-	ap := b.stateTree.AuditPath(D(t.data[0]), b.stateTree.N, b.stateTree.Base, key)
-	fmt.Println(b.stateTree.VerifyAuditPath(ap, key, gosmt.Empty, b.stateRoot))
-    return []byte{}
+func (b *Block) Corrupt() *Block {
+	b.interStateRoots[0] = Hash([]byte("random"))
+	return b
 }
 
+func (b *Block) TestSMT(t Transaction) bool {
+	// non-inclusion should return True
+	key := Hash([]byte("non-member")) // should return true
+	//key := t.keys[0] // should return false (has to be 32 bytes)
+	ap := b.stateTree.AuditPath(D(t.data[0]), b.stateTree.N, b.stateTree.Base, key)
+	return b.stateTree.VerifyAuditPath(ap, key, gosmt.Empty, b.stateRoot)
+}
+
+func (b *Block) VerifyFraudProof(fp FraudProof) bool {
+	// return true if the fraud proof is valid (ie. if a fraud happened)
+
+	// check Merkle proofs of transactions, prevStateRoot, nextStateRoot
+	// TODO
+
+	// check Merkle proofs of the keys-values contained in the transaction
+	for i := 0; i < len(fp.keys); i++ {
+		// reminder: gosmt returns true if non-inclusion
+		if b.stateTree.VerifyAuditPath(fp.witnesses[i], fp.keys[i], gosmt.Empty, b.stateRoot) {
+			return false
+		}
+	}
+
+	return true
+}

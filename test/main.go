@@ -4,7 +4,6 @@ import (
 	"fmt"
 	. "github.com/asonnino/fraudproofs_prototype"
 )
-//import "github.com/davecgh/go-spew/spew"
 
 
 // TODO: 1. build tests
@@ -17,6 +16,8 @@ func main() {
 	data := append([][]byte{},Hash([]byte{10,10,10}))
 	keys := append([][]byte{},data[0]) // same as the data? gosmt seems to generate keys on its own
 	t1, err := NewTransaction(keys, data)
+	//data = append([][]byte{},Hash([]byte{20,20,20}))
+	//keys = append([][]byte{},data[0]) // same as the data? gosmt seems to generate keys on its own
 	t2, err := NewTransaction(keys, data)
 	if err != nil {
 		fmt.Println(err)
@@ -28,14 +29,17 @@ func main() {
 	b1.AddTransaction(*t2)
 
 	// test
-	b1.RootTransition(nil,*t1,nil)
+	fmt.Println("Test SMT proof:",b1.TestSMT(*t1))
 
 	blockchain := NewBlockchain()
-	blockchain.Append(b1)
+	fp := blockchain.Append(b1.Corrupt())
+	if fp != nil {
+		fmt.Println("Test fraud proof:", b1.VerifyFraudProof(*fp))
+	}
 
-	fmt.Println(t1.ToChunks(2))
-	fmt.Println(t1)
-	fmt.Println(b1)
-	fmt.Println(blockchain)
+	fmt.Println("Chunks:", t1.ToChunks(2))
+	fmt.Println("Transaction 1:", t1)
+	fmt.Println("Block 1:", b1)
+	fmt.Println("Blockchain:", blockchain)
 
 }
