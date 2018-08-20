@@ -8,8 +8,10 @@ import (
 	"errors"
 )
 
-const Step int = 2 // interval on which to compute intermediate state roots (must be a positive integer)
-const ChunksSize int = 256 // the size of each chunk
+// Step defines the interval on which to compute intermediate state roots (must be a positive integer)
+const Step int = 2
+// ChunksSize defines the size of each chunk
+const ChunksSize int = 256
 
 // Block is a block of the blockchain
 type Block struct {
