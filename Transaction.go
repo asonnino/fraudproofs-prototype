@@ -1,37 +1,29 @@
-package fraudproofs_prototype
+package fraudproofs
 
 import "errors"
 
-
+// Transaction is a transaction of the blockchain.
 type Transaction struct {
 	keys [][]byte
 	data [][]byte
 }
 
+// NewTransaction creates a new transaction with the given keys and data.
 func NewTransaction(keys [][]byte, data [][]byte) (*Transaction, error) {
-	if len(keys) != len(data) {
-		return nil, errors.New("number of keys does not match the number of data")
+	t := &Transaction{keys, data}
+	err := t.CheckTransaction()
+	if err != nil {
+		return nil, err
 	}
-	return &Transaction{keys, data}, nil
+	return t, nil
 }
 
-func (t *Transaction) ToChunks(chunkSize int) [][]byte {
-	// flat
-	var buff []byte
-	for i := 0; i < len(t.keys); i++ {
-		buff = append(buff,t.keys[i]...)
-		buff = append(buff,t.data[i]...)
+// CheckTransaction verifies whether a transaction is well-formed.
+func (t *Transaction) CheckTransaction() (error) {
+	if len(t.keys) != len(t.data) {
+		return errors.New("number of keys does not match the number of data")
 	}
-	// split to chunks
-	var chunk []byte
-	chunks := make([][]byte, 0, len(buff)/chunkSize+1)
-	for len(buff) >= chunkSize {
-		chunk, buff = buff[:chunkSize], buff[chunkSize:]
-		chunks = append(chunks, chunk)
-	}
-	if len(buff) > 0 {
-		chunks = append(chunks, buff[:])
-	}
-	return chunks
+	return nil
 }
+
 
