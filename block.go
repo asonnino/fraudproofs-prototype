@@ -6,6 +6,7 @@ import (
 	"github.com/musalbas/smt"
 	"bytes"
 	"errors"
+	"fmt"
 )
 
 // Step defines the interval on which to compute intermediate state roots (must be a positive integer)
@@ -30,8 +31,8 @@ type Block struct {
 func NewBlock(t []Transaction, stateTree *smt.SparseMerkleTree) (*Block, error) {
 	var dataRoot, stateRoot []byte
 	dataTree := merkletree.New(sha256.New())
-	transactions := make([]Transaction, len(t))
-	interStateRoots := make([][]byte, int(len(t)/2))
+	var transactions []Transaction
+	var interStateRoots [][]byte
 
 	for i := 0; i < len(t); i++ {
 		err := t[i].CheckTransaction()
@@ -45,6 +46,7 @@ func NewBlock(t []Transaction, stateTree *smt.SparseMerkleTree) (*Block, error) 
 			if err != nil {
 				return nil, err
 			}
+			stateRoot = make([]byte, len(root))
 			copy(stateRoot, root)
 		}
 
@@ -56,13 +58,14 @@ func NewBlock(t []Transaction, stateTree *smt.SparseMerkleTree) (*Block, error) 
 		interStateRoots = append(interStateRoots, stateRoot)
 	}
 
-	chunks, err := makeChunks(chunksSize, t, interStateRoots)
+	chunks, _, err := makeChunks(chunksSize, t, interStateRoots)
 	if err != nil {
 		return nil, err
 	}
 	for i := 0; i < len(chunks); i++ {
 		dataTree.Push(chunks[i])
 	}
+	dataRoot = make([]byte, len(dataTree.Root()))
 	copy(dataRoot, dataTree.Root())
 
     return &Block{
@@ -75,18 +78,18 @@ func NewBlock(t []Transaction, stateTree *smt.SparseMerkleTree) (*Block, error) 
 }
 
 // makeChunks splits a set of transactions and state roots into multiple chunks.
-func makeChunks(chunkSize int, t []Transaction, s [][]byte) ([][]byte, error) {
+func makeChunks(chunkSize int, t []Transaction, s [][]byte) ([][]byte, map[[256]byte]int, error) {
 	if len(s) != int(len(t)/Step) {
-		return nil, errors.New("wrong number of intermediate state roots")
+		return nil, nil, errors.New("wrong number of intermediate state roots")
 	}
 	interStateRoots := make([][]byte, len(s))
 	copy(interStateRoots, s)
 
 	var buff []byte
-	buffMap := make(map[int]Transaction)
+	buffMap := make(map[[256]byte]int)
 	for i := 0; i < len(t); i++ {
 		for j := 0; j < len(t[i].writeKeys); j++ {
-			buffMap[len(buff)] = t[i]
+			buffMap[t[i].HashKey()] = len(buff)
 			buff = append(buff, t[i].writeKeys[j]...)
 			buff = append(buff, t[i].newData[j]...)
 		}
@@ -110,7 +113,7 @@ func makeChunks(chunkSize int, t []Transaction, s [][]byte) ([][]byte, error) {
 		chunks = append(chunks, buff[:])
 	}
 
-	return chunks, nil
+	return chunks, buffMap, nil
 }
 
 
@@ -137,7 +140,7 @@ func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error)
 
 			proofstate := make([][][]byte, len(keys))
 			for j := 0; j < len(keys); j++ {
-				proof, err := stateTree.Prove(keys[j])
+				proof, err := stateTree.ProveCompact(keys[j])
 				if err != nil {
 					return nil, err
 				}
@@ -153,7 +156,10 @@ func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error)
 			}
 
 			// 4. generate Merkle proofs of the transactions, previous state root, and next state root
-			chunksIndexes := b.getChunksIndexes(t)
+			chunksIndexes, err := b.getChunksIndexes(t)
+			if err != nil {
+				return nil, err
+			}
 			var proofIndexChunks []uint64
 			proofChunks := make([][][]byte, len(chunksIndexes))
 			for j := 0; j < len(chunksIndexes); j++ {
@@ -162,6 +168,7 @@ func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error)
 				proofIndexChunks = append(proofIndexChunks, proofIndex)
 				copy(proofChunks[j], proof)
 			}
+			fmt.Print(chunksIndexes)
 
 			// 5. build the witnesses as described in the fraud proof paper
 			// TODO: build the witnesses
@@ -169,9 +176,9 @@ func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error)
 
 			return &FraudProof{
 				keys,
+				proofstate,
 				prevStateRoot,
 				b.interStateRoots[i],
-				proofstate,
 				witnesses,
 				proofIndexChunks,
 				proofChunks}, nil
@@ -182,9 +189,18 @@ func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error)
 }
 
 // getChunksIndexes returns the indexes of the chunks in which the given transactions are included
-func (b *Block) getChunksIndexes(t []Transaction) []uint64 {
-	// TODO: select the right chunks
-	return []uint64{0}
+func (b *Block) getChunksIndexes(t []Transaction) ([]uint64, error) {
+	_, buffMap, err := makeChunks(chunksSize, b.transactions, b.interStateRoots)
+	if err != nil {
+		return nil, err
+	}
+
+	var chunksIndexes []uint64
+	for i := 0; i < len(t); i++ {
+		chunksIndexes = append(chunksIndexes, uint64(buffMap[t[i].HashKey()]/chunksSize))
+	}
+
+	return chunksIndexes, nil
 }
 
 // VerifyFraudProof verifies whether or not a fraud proof is valid.

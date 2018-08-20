@@ -1,6 +1,9 @@
 package fraudproofs
 
-import "errors"
+import (
+	"errors"
+	"crypto/sha256"
+)
 
 // Transaction is a transaction of the blockchain.
 type Transaction struct {
@@ -27,4 +30,13 @@ func (t *Transaction) CheckTransaction() (error) {
 	return nil
 }
 
+func (t *Transaction) HashKey() [256]byte {
+	h := sha256.New()
+	for i := 0; i < len(t.writeKeys); i++ {
+		h.Write(t.writeKeys[i])
+	}
+	var hashKey [256]byte
+	copy(hashKey[:], h.Sum(nil)[:])
+	return hashKey
+}
 
