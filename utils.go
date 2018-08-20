@@ -14,6 +14,7 @@ func Hash(data ...[]byte) []byte {
 }
 
 // ToChunks split a transaction and a state root into multiple chunks.
+/*
 func ToChunks(chunkSize int, t Transaction, stateRoot []byte) [][]byte {
 	var buff []byte
 	for i := 0; i < len(t.keys); i++ {
@@ -37,3 +38,4 @@ func ToChunks(chunkSize int, t Transaction, stateRoot []byte) [][]byte {
 
 	return chunks
 }
+*/

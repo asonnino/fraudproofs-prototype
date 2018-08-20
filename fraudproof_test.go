@@ -8,21 +8,22 @@ import (
 
 func TestTransaction(t *testing.T) {
 	h := sha256.New()
-	var data, keys [][]byte
+	var writeKeys, newData, readKeys [][]byte
 
-	data = append(data, []byte{0x01, 0x02, 0x03})
-	data = append(data, []byte{0x01, 0x02, 0x03})
+	newData = append(newData, []byte{0x01, 0x02, 0x03})
+	newData = append(newData, []byte{0x01, 0x02, 0x03})
 
-	h.Write(data[0])
-	keys = append(keys, h.Sum(nil))
-	_, err :=  NewTransaction(keys, data)
+	h.Write(newData[0])
+	writeKeys = append(writeKeys, h.Sum(nil))
+	_, err :=  NewTransaction(writeKeys, newData, readKeys)
 	if err == nil {
 		t.Error("should return an error")
 	}
 
-	keys = append(keys, h.Sum(nil))
-	_, err =  NewTransaction(keys, data)
+	writeKeys = append(writeKeys, h.Sum(nil))
+	_, err =  NewTransaction(writeKeys, newData, readKeys)
 	if err != nil {
 		t.Error(err)
 	}
 }
+

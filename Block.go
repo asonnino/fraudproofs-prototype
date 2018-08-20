@@ -23,15 +23,13 @@ type Block struct {
     // implementation specific
     prev            *Block // link to the previous block
     dataTree        *merkletree.Tree // Merkle tree storing chunks
-    stateTree       *smt.SparseMerkleTree // sparse Merkle tree storing key-values of the transactions
     interStateRoots [][]byte // intermediate state roots (saved every 'step' transactions)
 }
 
 // NewBlock creates a new block with the given transactions.
-func NewBlock(t []Transaction) (*Block, error) {
+func NewBlock(t []Transaction, stateTree *smt.SparseMerkleTree) (*Block, error) {
 	var dataRoot, stateRoot []byte
 	dataTree := merkletree.New(sha256.New())
-	stateTree := smt.NewSparseMerkleTree(smt.NewSimpleMap(), sha256.New())
 	transactions := make([]Transaction, len(t))
 	interStateRoots := make([][]byte, int(len(t)/2))
 
@@ -42,8 +40,8 @@ func NewBlock(t []Transaction) (*Block, error) {
 		}
 		transactions = append(transactions,t[i])
 
-		for j := 0; j < len(t[i].keys); j++ {
-			root, err := stateTree.Update(t[i].keys[j], t[i].data[j])
+		for j := 0; j < len(t[i].writeKeys); j++ {
+			root, err := stateTree.Update(t[i].writeKeys[j], t[i].newData[j])
 			if err != nil {
 				return nil, err
 			}
@@ -73,7 +71,6 @@ func NewBlock(t []Transaction) (*Block, error) {
 		transactions,
         nil,
 		dataTree,
-		stateTree,
 		interStateRoots}, nil
 }
 
@@ -87,9 +84,9 @@ func makeChunks(chunkSize int, t []Transaction, s [][]byte) ([][]byte, error) {
 
 	var buff []byte
 	for i := 0; i < len(t); i++ {
-		for j := 0; j < len(t[i].keys); j++ {
-			buff = append(buff, t[i].keys[j]...)
-			buff = append(buff, t[i].data[j]...)
+		for j := 0; j < len(t[i].writeKeys); j++ {
+			buff = append(buff, t[i].writeKeys[j]...)
+			buff = append(buff, t[i].newData[j]...)
 		}
 
 		if i != 0 && i%Step == 0 {
@@ -116,8 +113,8 @@ func makeChunks(chunkSize int, t []Transaction, s [][]byte) ([][]byte, error) {
 
 
 // CheckBlock checks that the block is constructed correctly, and returns a fraud proof if it is not.
-func (b *Block) CheckBlock() (*FraudProof, error) {
-	rebuiltBlock, err := NewBlock(b.transactions)
+func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error) {
+	rebuiltBlock, err := NewBlock(b.transactions, stateTree)
 	if err != nil {
 		return nil, err
 	}
@@ -132,13 +129,13 @@ func (b *Block) CheckBlock() (*FraudProof, error) {
 			var keys [][]byte
 			for j := 0; j < len(t); j++ {
 				for k := 0; k < len(t); k++ {
-					keys = append(keys, t[j].keys[k])
+					keys = append(keys, t[j].writeKeys[k])
 				}
 			}
 
 			proofstate := make([][][]byte, len(keys))
 			for j := 0; j < len(keys); j++ {
-				proof, err := b.stateTree.Prove(keys[j])
+				proof, err := stateTree.Prove(keys[j])
 				if err != nil {
 					return nil, err
 				}
