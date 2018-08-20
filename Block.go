@@ -11,7 +11,7 @@ import (
 // Step defines the interval on which to compute intermediate state roots (must be a positive integer)
 const Step int = 2
 // ChunksSize defines the size of each chunk
-const ChunksSize int = 256
+const chunksSize int = 256
 
 // Block is a block of the blockchain
 type Block struct {
@@ -56,7 +56,7 @@ func NewBlock(t []Transaction, stateTree *smt.SparseMerkleTree) (*Block, error) 
 		interStateRoots = append(interStateRoots, stateRoot)
 	}
 
-	chunks, err := makeChunks(ChunksSize, t, interStateRoots)
+	chunks, err := makeChunks(chunksSize, t, interStateRoots)
 	if err != nil {
 		return nil, err
 	}
@@ -83,8 +83,10 @@ func makeChunks(chunkSize int, t []Transaction, s [][]byte) ([][]byte, error) {
 	copy(interStateRoots, s)
 
 	var buff []byte
+	buffMap := make(map[int]Transaction)
 	for i := 0; i < len(t); i++ {
 		for j := 0; j < len(t[i].writeKeys); j++ {
+			buffMap[len(buff)] = t[i]
 			buff = append(buff, t[i].writeKeys[j]...)
 			buff = append(buff, t[i].newData[j]...)
 		}
@@ -212,38 +214,3 @@ func (b *Block) Corrupt(interStateRoot int) (*Block, error) {
 }
 */
 
-/*
-// AddTransaction adds a transaction to the block.
-func (b *Block) AddTransaction(t Transaction) error {
-	err := t.CheckTransaction()
-	if err != nil {
-		return err
-	}
-
-    b.transactions = append(b.transactions,t)
-    b.length++
-
-	for i := 0; i < len(t.keys); i++ {
-		root, err := b.stateTree.Update(t.keys[i], t.data[i])
-		if err != nil {
-			return err
-		}
-		b.stateRoot = root
-	}
-
-    var chunks [][]byte
-	if b.length%Step == 0 {
-		b.interStateRoots = append(b.interStateRoots,b.stateRoot)
-		chunks = ToChunks(ChunksSize, t, b.stateRoot)
-	} else {
-		chunks = ToChunks(ChunksSize, t, nil)
-	}
-
-	for i := 0; i < len(chunks); i++ {
-		b.dataTree.Push(chunks[i])
-	}
-	b.dataRoot = b.dataTree.Root()
-
-	return nil
-}
-*/

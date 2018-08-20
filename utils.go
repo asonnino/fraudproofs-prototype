@@ -1,10 +1,7 @@
 package fraudproofs
 
-import (
-	"crypto/sha512"
-)
-
 // Hash implements an example of hash function.
+/*
 func Hash(data ...[]byte) []byte {
 	hasher := sha512.New512_256()
 	for i := 0; i < len(data); i++ {
@@ -12,6 +9,7 @@ func Hash(data ...[]byte) []byte {
 	}
 	return hasher.Sum(nil)
 }
+*/
 
 // ToChunks split a transaction and a state root into multiple chunks.
 /*
