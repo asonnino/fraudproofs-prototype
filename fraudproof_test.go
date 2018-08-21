@@ -80,8 +80,6 @@ func TestBlock(test *testing.T) {
 	if ret != false {
 		test.Error("invalid fraud proof should not check")
 	}
-
-	// TODO: test witnesses
 }
 
 func TestBlockchain(test *testing.T) {

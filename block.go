@@ -158,22 +158,14 @@ func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error)
 
 			proofstate := make([][][]byte, len(keys))
 			for j := 0; j < len(keys); j++ {
-				proof, err := stateTree.ProveCompact(keys[j])
+				proof, err := stateTree.Prove(keys[j])
 				if err != nil {
 					return nil, err
 				}
 				proofstate[j] = proof
 			}
 
-			// 3. get the previous (ie. the correct) state root if any
-			var prevStateRoot []byte
-			if i != 0 {
-				prevStateRoot = b.interStateRoots[i-1]
-			} else {
-				prevStateRoot = nil
-			}
-
-			// 4. generate Merkle proofs of the transactions, previous state root, and next state root
+			// 3. generate Merkle proofs of the transactions, previous state root, and next state root
 			chunksIndexes, _, err := b.getChunksIndexes(t)
 			if err != nil {
 				return nil, err
@@ -195,17 +187,10 @@ func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error)
 				proofChunks[j] = proof
 			}
 
-			// 5. build the witnesses to allow reconstruction of the corrupted intermediate state
-			// TODO: build the witnesses
-			var witnesses [][][]byte
-
 			return &FraudProof{
 				keys,
 				data,
 				proofstate,
-				prevStateRoot,
-				b.interStateRoots[i],
-				witnesses,
 				proofChunks}, nil
 		}
 	}
@@ -249,15 +234,22 @@ func (b *Block) VerifyFraudProof(fp FraudProof) bool {
 	}
 
 	// 2. check keys-values contained in the transaction are in the state tree
+	// in theory, this is not needed, as this check is performed automatically by 3.
 	for i := 0; i < len(fp.keys); i++ {
-		ret := smt.VerifyCompactProof(fp.proofState[i], b.stateRoot, fp.keys[i], fp.data[i], sha256.New())
+		ret := smt.VerifyProof(fp.proofState[i], b.stateRoot, fp.keys[i], fp.data[i], sha256.New())
 		if ret != true {
 			return false
 		}
 	}
 
-	// 3. verify that nextStateRoot is indeed built incorrectly using the witnesses
-	// TODO: verify nextStateRoot
+	// 3. check keys-values contained in the transaction are in the state tree
+	subtree := smt.NewDeepSparseMerkleSubTree(smt.NewSimpleMap(), sha256.New())
+	for i := 0; i < len(fp.keys); i++ {
+		subtree.AddBranches(fp.proofState[i], fp.keys[i],fp.data[i], true)
+	}
+	if bytes.Compare(b.stateRoot, subtree.Root()) != 0 {
+		return false
+	}
 
 	return true
 }

@@ -6,8 +6,5 @@ type FraudProof struct {
 	keys [][]byte
 	data [][]byte
 	proofState [][][]byte
-	prevStateRoot []byte
-	nextStateRoot []byte
-	witnesses [][][]byte
 	proofChunks [][][]byte
 }
