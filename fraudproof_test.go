@@ -70,6 +70,8 @@ func TestBlock(test *testing.T) {
 		test.Error("should return an error")
 	}
 
+	// TODO: test witnesses
+
 	blockchain := NewBlockchain()
 	blockchain.Append(goodBlock) // add a first block
 	_, err = blockchain.Append(goodBlock) // add a second block
