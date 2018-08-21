@@ -30,10 +30,15 @@ func (t *Transaction) CheckTransaction() (error) {
 	return nil
 }
 
+// HashKey creates a compact representation of a transaction
 func (t *Transaction) HashKey() [256]byte {
 	h := sha256.New()
 	for i := 0; i < len(t.writeKeys); i++ {
 		h.Write(t.writeKeys[i])
+		h.Write(t.newData[i])
+	}
+	for i := 0; i < len(t.readKeys); i++ {
+		h.Write(t.readKeys[i])
 	}
 	var hashKey [256]byte
 	copy(hashKey[:], h.Sum(nil)[:])

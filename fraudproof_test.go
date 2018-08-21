@@ -28,33 +28,63 @@ func TestBlock(test *testing.T) {
 		test.Error("should return an error")
 	}
 
-	t, stateTree := generateBlockInput()
-	b, err :=  NewBlock(t, stateTree)
+	goodTransaction, stateTree := generateBlockInput()
+	goodBlock, err :=  NewBlock(goodTransaction, stateTree)
 	if err != nil {
 		test.Error(err)
 	}
 
-	_, err = b.CheckBlock(stateTree)
+	_, err = goodBlock.CheckBlock(stateTree)
 	if err != nil {
 		test.Error(err)
 	}
 
-	b = corruptBlockInterStates(b)
-	fp, err := b.CheckBlock(stateTree)
+	badBlock := corruptBlockInterStates(goodBlock)
+	goodFp, err := badBlock.CheckBlock(stateTree)
+	if err != nil {
+		test.Error(err)
+	} else if goodFp == nil {
+		test.Error("should return a fraud proof")
+	}
+
+	ret := badBlock.VerifyFraudProof(*goodFp)
+	if ret != true {
+		test.Error("fraud proof does not check")
+	}
+
+	corruptedFp := corruptFraudproofChunks(goodFp)
+	ret = badBlock.VerifyFraudProof(*corruptedFp)
+	if ret != false {
+		test.Error("invalid fraud proof should not check")
+	}
+
+	corruptedFp = corruptFraudproofState(goodFp)
+	ret = badBlock.VerifyFraudProof(*corruptedFp)
+	if ret != false {
+		test.Error("invalid fraud proof should not check")
+	}
+
+	badBlock = generateBlockWithCorruptedTransactions()
+	_, err = badBlock.CheckBlock(stateTree)
+	if err == nil {
+		test.Error("should return an error")
+	}
+
+	blockchain := NewBlockchain()
+	blockchain.Append(goodBlock) // add a first block
+	_, err = blockchain.Append(goodBlock) // add a second block
+	if err != nil {
+		test.Error(err)
+	}
+
+	fp, err := blockchain.Append(corruptBlockInterStates(goodBlock))
 	if err != nil {
 		test.Error(err)
 	} else if fp == nil {
 		test.Error("should return a fraud proof")
 	}
 
-	ret  := b.VerifyFraudProof(*fp)
-	if ret != true {
-		test.Error("fraud proof does not check")
-	}
-
-
-	b = corruptBlockTransactions(b)
-	_, err = b.CheckBlock(stateTree)
+	_, err = blockchain.Append(generateBlockWithCorruptedTransactions())
 	if err == nil {
 		test.Error("should return an error")
 	}
@@ -112,10 +142,11 @@ func generateCorruptedBlockInput() ([]Transaction, *smt.SparseMerkleTree) {
 	return []Transaction{*t1,*t2}, stateTree
 }
 
-func corruptBlockTransactions(b *Block) (*Block) {
-	t := b.transactions[0]
-	b.transactions[0] = *corruptTransaction(&t)
-	return b
+func generateBlockWithCorruptedTransactions() (*Block) {
+	block, _ := NewBlock(generateBlockInput())
+	t := block.transactions[0]
+	block.transactions[0] = *corruptTransaction(&t)
+	return block
 }
 
 func corruptBlockInterStates(b *Block) (*Block) {
@@ -133,4 +164,18 @@ func corruptBlockInterStates(b *Block) (*Block) {
 		nil,
 		dataTree,
 		b.interStateRoots}
+}
+
+func corruptFraudproofChunks(fp *FraudProof) (*FraudProof) {
+	h := sha256.New()
+	h.Write([]byte("random"))
+	fp.proofChunks[0] = [][]byte{h.Sum(nil), h.Sum(nil)}
+	return fp
+}
+
+func corruptFraudproofState(fp *FraudProof) (*FraudProof) {
+	h := sha256.New()
+	h.Write([]byte("random"))
+	fp.proofState[0] = [][]byte{h.Sum(nil), h.Sum(nil)}
+	return fp
 }
