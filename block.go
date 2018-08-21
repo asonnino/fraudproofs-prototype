@@ -148,9 +148,11 @@ func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error)
 
 			// 2. generate Merkle proofs of the keys-values contained in the transaction
 			var keys [][]byte
+			var data [][]byte
 			for j := 0; j < len(t); j++ {
 				for k := 0; k < len(t); k++ {
 					keys = append(keys, t[j].writeKeys[k])
+					data = append(data, t[j].newData[k])
 				}
 			}
 
@@ -199,6 +201,7 @@ func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error)
 
 			return &FraudProof{
 				keys,
+				data,
 				proofstate,
 				prevStateRoot,
 				b.interStateRoots[i],
@@ -240,14 +243,17 @@ func (b *Block) VerifyFraudProof(fp FraudProof) bool {
 	chunksIndexes, numOfIndexes, _ := b.getChunksIndexes(b.transactions)
 	for i := 0; i<len(fp.proofChunks); i++ {
 		ret := merkletree.VerifyProof(sha256.New(), b.dataRoot, fp.proofChunks[i], chunksIndexes[i], numOfIndexes)
-		if ret == false {
+		if ret != true {
 			return false
 		}
 	}
 
 	// 2. check keys-values contained in the transaction are in the state tree
 	for i := 0; i < len(fp.keys); i++ {
-		// TODO
+		ret := smt.VerifyCompactProof(fp.proofState[i], b.stateRoot, fp.keys[i], fp.data[i], sha256.New())
+		if ret != true {
+			return false
+		}
 	}
 
 	// 3. verify that nextStateRoot is indeed built incorrectly using the witnesses
@@ -256,14 +262,4 @@ func (b *Block) VerifyFraudProof(fp FraudProof) bool {
 	return true
 }
 
-/*
-// Corrupt corrupts the block by modifying the specified intermediate state root.
-func (b *Block) Corrupt(interStateRoot int) (*Block, error) {
-	if interStateRoot >= len(b.interStateRoots) {
-		return nil, errors.New("index out of bound")
-	}
-	b.interStateRoots[interStateRoot] = Hash([]byte("random"))
-	return b, nil
-}
-*/
 
