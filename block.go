@@ -1,12 +1,11 @@
 package fraudproofs
 
 import (
-	"crypto/sha256"
 	"github.com/NebulousLabs/merkletree"
 	"github.com/musalbas/smt"
 	"bytes"
 	"errors"
-	"fmt"
+	"crypto/sha256"
 )
 
 // Step defines the interval on which to compute intermediate state roots (must be a positive integer)
@@ -29,22 +28,44 @@ type Block struct {
 
 // NewBlock creates a new block with the given transactions.
 func NewBlock(t []Transaction, stateTree *smt.SparseMerkleTree) (*Block, error) {
-	var dataRoot, stateRoot []byte
-	dataTree := merkletree.New(sha256.New())
-	var transactions []Transaction
-	var interStateRoots [][]byte
-
 	for i := 0; i < len(t); i++ {
 		err := t[i].CheckTransaction()
 		if err != nil {
 			return nil, err
 		}
-		transactions = append(transactions,t[i])
+	}
 
+	interStateRoots, stateRoot, err := fillStateTree(t, stateTree)
+	if err != nil {
+		return nil, err
+	}
+
+	dataTree := merkletree.New(sha256.New())
+	dataRoot, err := fillDataTree(t, interStateRoots, dataTree)
+	if err != nil {
+		return nil, err
+	}
+
+    return &Block{
+        dataRoot,
+        stateRoot,
+		t,
+        nil,
+		dataTree,
+		interStateRoots}, nil
+}
+
+// fillStateTree fills the input state tree with key-values from the input transactions, and returns the state root and
+// the intermediate state roots.
+func fillStateTree(t []Transaction, stateTree *smt.SparseMerkleTree) ([][]byte, []byte, error){
+	var stateRoot []byte
+	var interStateRoots [][]byte
+
+	for i := 0; i < len(t); i++ {
 		for j := 0; j < len(t[i].writeKeys); j++ {
 			root, err := stateTree.Update(t[i].writeKeys[j], t[i].newData[j])
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			stateRoot = make([]byte, len(root))
 			copy(stateRoot, root)
@@ -58,6 +79,11 @@ func NewBlock(t []Transaction, stateTree *smt.SparseMerkleTree) (*Block, error) 
 		interStateRoots = append(interStateRoots, stateRoot)
 	}
 
+	return interStateRoots, stateRoot, nil
+}
+
+// fillDataTree fills the data tree and returns its root.
+func fillDataTree(t []Transaction, interStateRoots [][]byte, dataTree *merkletree.Tree) ([]byte, error) {
 	chunks, _, err := makeChunks(chunksSize, t, interStateRoots)
 	if err != nil {
 		return nil, err
@@ -65,16 +91,7 @@ func NewBlock(t []Transaction, stateTree *smt.SparseMerkleTree) (*Block, error) 
 	for i := 0; i < len(chunks); i++ {
 		dataTree.Push(chunks[i])
 	}
-	dataRoot = make([]byte, len(dataTree.Root()))
-	copy(dataRoot, dataTree.Root())
-
-    return &Block{
-        dataRoot,
-        stateRoot,
-		transactions,
-        nil,
-		dataTree,
-		interStateRoots}, nil
+	return dataTree.Root(), nil
 }
 
 // makeChunks splits a set of transactions and state roots into multiple chunks.
@@ -116,7 +133,6 @@ func makeChunks(chunkSize int, t []Transaction, s [][]byte) ([][]byte, map[[256]
 	return chunks, buffMap, nil
 }
 
-
 // CheckBlock checks that the block is constructed correctly, and returns a fraud proof if it is not.
 func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error) {
 	rebuiltBlock, err := NewBlock(b.transactions, stateTree)
@@ -156,21 +172,28 @@ func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error)
 			}
 
 			// 4. generate Merkle proofs of the transactions, previous state root, and next state root
-			chunksIndexes, err := b.getChunksIndexes(t)
+			chunksIndexes, _, err := b.getChunksIndexes(t)
 			if err != nil {
 				return nil, err
 			}
-			var proofIndexChunks []uint64
 			proofChunks := make([][][]byte, len(chunksIndexes))
 			for j := 0; j < len(chunksIndexes); j++ {
-				b.dataTree.SetIndex(chunksIndexes[j])
-				_, proof, proofIndex, _ := b.dataTree.Prove()
-				proofIndexChunks = append(proofIndexChunks, proofIndex)
-				copy(proofChunks[j], proof)
+				// merkletree.Tree cannot call SetIndex on Tree if Tree has not been reset
+				// a dirty workaround is to copy the data tree
+				tmpDataTree := merkletree.New(sha256.New())
+				err = tmpDataTree.SetIndex(chunksIndexes[j])
+				if err != nil {
+					return nil, err
+				}
+				_, err := fillDataTree(b.transactions, b.interStateRoots, tmpDataTree)
+				if err != nil {
+					return nil, err
+				}
+				_, proof, _, _ := tmpDataTree.Prove()
+				proofChunks[j] = proof
 			}
-			fmt.Print(chunksIndexes)
 
-			// 5. build the witnesses as described in the fraud proof paper
+			// 5. build the witnesses to allow reconstruction of the corrupted intermediate state
 			// TODO: build the witnesses
 			var witnesses [][][]byte
 
@@ -180,7 +203,6 @@ func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error)
 				prevStateRoot,
 				b.interStateRoots[i],
 				witnesses,
-				proofIndexChunks,
 				proofChunks}, nil
 		}
 	}
@@ -188,11 +210,11 @@ func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error)
 	return nil, nil
 }
 
-// getChunksIndexes returns the indexes of the chunks in which the given transactions are included
-func (b *Block) getChunksIndexes(t []Transaction) ([]uint64, error) {
-	_, buffMap, err := makeChunks(chunksSize, b.transactions, b.interStateRoots)
+// getChunksIndexes returns the indexes and number of chunks in which the given transactions are included
+func (b *Block) getChunksIndexes(t []Transaction) ([]uint64, uint64, error) {
+	chunks, buffMap, err := makeChunks(chunksSize, b.transactions, b.interStateRoots)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	var chunksIndexes []uint64
@@ -200,13 +222,28 @@ func (b *Block) getChunksIndexes(t []Transaction) ([]uint64, error) {
 		chunksIndexes = append(chunksIndexes, uint64(buffMap[t[i].HashKey()]/chunksSize))
 	}
 
-	return chunksIndexes, nil
+	uniquesMap := make(map[uint64]bool)
+	var uniques []uint64
+	for _, entry := range chunksIndexes {
+		if _, value := uniquesMap[entry]; !value {
+			uniquesMap[entry] = true
+			uniques = append(uniques, entry)
+		}
+	}
+
+	return uniques, uint64(len(chunks)), nil
 }
 
 // VerifyFraudProof verifies whether or not a fraud proof is valid.
 func (b *Block) VerifyFraudProof(fp FraudProof) bool {
 	// 1. check that the transactions, prevStateRoot, nextStateRoot are in the data tree
-	// TODO
+	chunksIndexes, numOfIndexes, _ := b.getChunksIndexes(b.transactions)
+	for i := 0; i<len(fp.proofChunks); i++ {
+		ret := merkletree.VerifyProof(sha256.New(), b.dataRoot, fp.proofChunks[i], chunksIndexes[i], numOfIndexes)
+		if ret == false {
+			return false
+		}
+	}
 
 	// 2. check keys-values contained in the transaction are in the state tree
 	for i := 0; i < len(fp.keys); i++ {

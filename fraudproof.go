@@ -8,6 +8,5 @@ type FraudProof struct {
 	prevStateRoot []byte
 	nextStateRoot []byte
 	witnesses [][][]byte
-	proofIndexChunks []uint64
 	proofChunks [][][]byte
 }

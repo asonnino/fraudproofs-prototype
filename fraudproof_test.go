@@ -4,81 +4,133 @@ import (
 	"testing"
 	"crypto/sha256"
 	"github.com/musalbas/smt"
+	"math/rand"
+	"github.com/NebulousLabs/merkletree"
 )
 
 
-func TestTransaction(t *testing.T) {
-	_, err :=  makeCorruptedTransaction()
+func TestTransaction(test *testing.T) {
+	_, err :=  NewTransaction(generateCorruptedTransactionInput())
 	if err == nil {
-		t.Error("should return an error")
+		test.Error("should return an error")
 	}
 
-	_, err =  makeTransaction()
+	_, err =  NewTransaction(generateTransactionInput())
 	if err != nil {
-		t.Error(err)
+		test.Error(err)
 	}
 }
 
 
-func TestBlock(t *testing.T) {
-	_, err :=  makeCorruptedBlock()
+func TestBlock(test *testing.T) {
+	_, err :=  NewBlock(generateCorruptedBlockInput())
 	if err == nil {
-		t.Error("should return an error")
+		test.Error("should return an error")
 	}
 
-	_, err = makeBlock()
+	t, stateTree := generateBlockInput()
+	b, err :=  NewBlock(t, stateTree)
 	if err != nil {
-		t.Error(err)
+		test.Error(err)
+	}
+
+	_, err = b.CheckBlock(stateTree)
+	if err != nil {
+		test.Error(err)
+	}
+
+	b = corruptBlockInterStates(b)
+	fp, err := b.CheckBlock(stateTree)
+	if err != nil {
+		test.Error(err)
+	} else if fp == nil {
+		test.Error("should return a fraud proof")
+	}
+
+	ret  := b.VerifyFraudProof(*fp)
+	if ret != true {
+		test.Error("fraud proof does not check")
+	}
+
+
+	b = corruptBlockTransactions(b)
+	_, err = b.CheckBlock(stateTree)
+	if err == nil {
+		test.Error("should return an error")
 	}
 }
+
 
 // ------------------
 
-func makeTransaction() (*Transaction, error) {
+
+func generateTransactionInput() ([][]byte, [][]byte, [][]byte) {
 	h := sha256.New()
 	var writeKeys, newData, readKeys [][]byte
 
-	newData = append(newData, []byte{0x01, 0x02, 0x03})
-	newData = append(newData, []byte{0x01, 0x02, 0x03})
+	token := make([]byte, 3)
+	rand.Read(token)
+	newData = append(newData, token)
+	token = make([]byte, 3)
+	rand.Read(token)
+	newData = append(newData, token)
 
 	h.Write(newData[0])
 	writeKeys = append(writeKeys, h.Sum(nil))
-	writeKeys = append(writeKeys, writeKeys[0])
+	h.Reset()
+	h.Write(newData[1])
+	writeKeys = append(writeKeys, h.Sum(nil))
 
-	t, err :=  NewTransaction(writeKeys, newData, readKeys)
-	return t, err
+	return writeKeys, newData, readKeys
 }
 
-func makeCorruptedTransaction() (*Transaction, error) {
+func generateCorruptedTransactionInput() ([][]byte, [][]byte, [][]byte) {
+	writeKeys, newData, readKeys := generateTransactionInput()
+	writeKeys = writeKeys[1:]
+	return writeKeys, newData, readKeys
+}
+
+func corruptTransaction(t *Transaction) (*Transaction) {
+	t.writeKeys = t.writeKeys[1:]
+	return t
+}
+
+func generateBlockInput() ([]Transaction, *smt.SparseMerkleTree) {
+	t1, _ := NewTransaction(generateTransactionInput())
+	t2, _ := NewTransaction(generateTransactionInput())
+	stateTree := smt.NewSparseMerkleTree(smt.NewSimpleMap(), sha256.New())
+	return []Transaction{*t1,*t2}, stateTree
+}
+
+func generateCorruptedBlockInput() ([]Transaction, *smt.SparseMerkleTree) {
+	t1, _ := NewTransaction(generateTransactionInput())
+	t2, _ := NewTransaction(generateTransactionInput())
+
+	t1 = corruptTransaction(t1)
+
+	stateTree := smt.NewSparseMerkleTree(smt.NewSimpleMap(), sha256.New())
+	return []Transaction{*t1,*t2}, stateTree
+}
+
+func corruptBlockTransactions(b *Block) (*Block) {
+	t := b.transactions[0]
+	b.transactions[0] = *corruptTransaction(&t)
+	return b
+}
+
+func corruptBlockInterStates(b *Block) (*Block) {
 	h := sha256.New()
-	var writeKeys, newData, readKeys [][]byte
+	h.Write([]byte("random"))
+	b.interStateRoots[0] = h.Sum(nil)
 
-	newData = append(newData, []byte{0x01, 0x02, 0x03})
-	newData = append(newData, []byte{0x01, 0x02, 0x03})
+	dataTree := merkletree.New(sha256.New())
+	dataRoot, _ := fillDataTree(b.transactions, b.interStateRoots, dataTree)
 
-	h.Write(newData[0])
-	writeKeys = append(writeKeys, h.Sum(nil))
-
-	t, err :=  NewTransaction(writeKeys, newData, readKeys)
-	return t, err
-}
-
-func makeBlock() (*Block, error) {
-	t1, _ := makeTransaction()
-	t2, _ := makeTransaction()
-
-	stateTree := smt.NewSparseMerkleTree(smt.NewSimpleMap(), sha256.New())
-	b, err := NewBlock([]Transaction{*t1,*t2}, stateTree)
-	return b, err
-}
-
-func makeCorruptedBlock() (*Block, error) {
-	t1, _ := makeTransaction()
-	t2, _ := makeTransaction()
-
-	t1.writeKeys = t1.writeKeys[1:] // corrupt t1
-
-	stateTree := smt.NewSparseMerkleTree(smt.NewSimpleMap(), sha256.New())
-	b, err := NewBlock([]Transaction{*t1,*t2}, stateTree)
-	return b, err
+	return &Block{
+		dataRoot,
+		b.stateRoot,
+		b.transactions,
+		nil,
+		dataTree,
+		b.interStateRoots}
 }
