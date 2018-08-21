@@ -257,7 +257,7 @@ func (b *Block) VerifyFraudProof(fp FraudProof) bool {
 	}
 
 	// 3. verify that nextStateRoot is indeed built incorrectly using the witnesses
-	// TODO
+	// TODO: verify nextStateRoot
 
 	return true
 }
