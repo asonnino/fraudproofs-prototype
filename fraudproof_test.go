@@ -6,6 +6,7 @@ import (
 	"github.com/musalbas/smt"
 	"math/rand"
 	"github.com/NebulousLabs/merkletree"
+	"github.com/jinzhu/copier"
 )
 
 
@@ -178,15 +179,19 @@ func corruptBlockInterStates(b *Block) (*Block) {
 }
 
 func corruptFraudproofChunks(fp *FraudProof) (*FraudProof) {
+	copyFp := &FraudProof{}
+	copier.Copy(copyFp, fp)
 	h := sha256.New()
 	h.Write([]byte("random"))
-	fp.proofChunks[0] = [][]byte{h.Sum(nil), h.Sum(nil)}
-	return fp
+	copyFp.proofChunks[0] = [][]byte{h.Sum(nil), h.Sum(nil)}
+	return copyFp
 }
 
 func corruptFraudproofState(fp *FraudProof) (*FraudProof) {
+	copyFp := &FraudProof{}
+	copier.Copy(copyFp, fp)
 	h := sha256.New()
 	h.Write([]byte("random"))
-	fp.proofState[0] = [][]byte{h.Sum(nil), h.Sum(nil)}
-	return fp
+	copyFp.proofState[0] = [][]byte{h.Sum(nil), h.Sum(nil)}
+	return copyFp
 }
