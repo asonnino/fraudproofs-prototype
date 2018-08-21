@@ -73,6 +73,7 @@ func TestBlock(test *testing.T) {
 	// TODO: test witnesses
 
 	blockchain := NewBlockchain()
+	goodBlock, _ = NewBlock(generateBlockInput())
 	blockchain.Append(goodBlock) // add a first block
 	_, err = blockchain.Append(goodBlock) // add a second block
 	if err != nil {
