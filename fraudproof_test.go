@@ -71,16 +71,20 @@ func TestBlock(test *testing.T) {
 	}
 
 	// TODO: test witnesses
+}
 
+func TestBlockchain(test *testing.T) {
 	blockchain := NewBlockchain()
-	goodBlock, _ = NewBlock(generateBlockInput())
+	goodBlock, _ := NewBlock(generateBlockInput())
 	blockchain.Append(goodBlock) // add a first block
-	_, err = blockchain.Append(goodBlock) // add a second block
+	fp, err := blockchain.Append(goodBlock) // add a second block
 	if err != nil {
 		test.Error(err)
+	} else if fp != nil {
+		test.Error("should not return a fraud proof")
 	}
 
-	fp, err := blockchain.Append(corruptBlockInterStates(goodBlock))
+	fp, err = blockchain.Append(corruptBlockInterStates(goodBlock))
 	if err != nil {
 		test.Error(err)
 	} else if fp == nil {
