@@ -11,11 +11,13 @@ import (
 
 
 func TestTransaction(test *testing.T) {
+	// create good transaction
 	_, err :=  NewTransaction(generateCorruptedTransactionInput())
 	if err == nil {
 		test.Error("should return an error")
 	}
 
+	// create bad transaction
 	_, err =  NewTransaction(generateTransactionInput())
 	if err != nil {
 		test.Error(err)
@@ -24,23 +26,34 @@ func TestTransaction(test *testing.T) {
 
 
 func TestBlock(test *testing.T) {
+	// create bad block (corrupted transactions)
 	_, err :=  NewBlock(generateCorruptedBlockInput())
 	if err == nil {
 		test.Error("should return an error")
 	}
 
+	// create good block
 	goodTransaction, stateTree := generateBlockInput()
 	goodBlock, err :=  NewBlock(goodTransaction, stateTree)
 	if err != nil {
 		test.Error(err)
 	}
 
+	// check good block
 	_, err = goodBlock.CheckBlock(stateTree)
 	if err != nil {
 		test.Error(err)
 	}
 
-	badBlock := corruptBlockInterStates(goodBlock)
+	// check a bad block (corrupted transactions)
+	badBlock := generateBlockWithCorruptedTransactions()
+	_, err = badBlock.CheckBlock(stateTree)
+	if err == nil {
+		test.Error("should return an error")
+	}
+
+	// check bad block (corrupted intermediate state)
+	badBlock = corruptBlockInterStates(goodBlock)
 	goodFp, err := badBlock.CheckBlock(stateTree)
 	if err != nil {
 		test.Error(err)
@@ -48,33 +61,31 @@ func TestBlock(test *testing.T) {
 		test.Error("should return a fraud proof")
 	}
 
+	// verify fraud proof of bad block
 	ret := badBlock.VerifyFraudProof(*goodFp)
 	if ret != true {
 		test.Error("fraud proof does not check")
 	}
 
+	// verify corrupted fraud proof (corrupted chunks proof)
 	corruptedFp := corruptFraudproofChunks(goodFp)
 	ret = badBlock.VerifyFraudProof(*corruptedFp)
 	if ret != false {
 		test.Error("invalid fraud proof should not check")
 	}
 
+	// verify corrupted fraud proof (corrupted state proof)
 	corruptedFp = corruptFraudproofState(goodFp)
 	ret = badBlock.VerifyFraudProof(*corruptedFp)
 	if ret != false {
 		test.Error("invalid fraud proof should not check")
 	}
 
-	badBlock = generateBlockWithCorruptedTransactions()
-	_, err = badBlock.CheckBlock(stateTree)
-	if err == nil {
-		test.Error("should return an error")
-	}
-
 	// TODO: test witnesses
 }
 
 func TestBlockchain(test *testing.T) {
+	// add good blocks to blockchain
 	blockchain := NewBlockchain()
 	goodBlock, _ := NewBlock(generateBlockInput())
 	blockchain.Append(goodBlock) // add a first block
@@ -85,6 +96,7 @@ func TestBlockchain(test *testing.T) {
 		test.Error("should not return a fraud proof")
 	}
 
+	// add bad block to blockchain (corrupted intermediate state)
 	fp, err = blockchain.Append(corruptBlockInterStates(goodBlock))
 	if err != nil {
 		test.Error(err)
@@ -92,6 +104,7 @@ func TestBlockchain(test *testing.T) {
 		test.Error("should return a fraud proof")
 	}
 
+	// add bad block to blockchain (corrupted transactions)
 	_, err = blockchain.Append(generateBlockWithCorruptedTransactions())
 	if err == nil {
 		test.Error("should return an error")
@@ -99,7 +112,7 @@ func TestBlockchain(test *testing.T) {
 }
 
 
-// ------------------
+// ------------------ helpers ------------------ //
 
 
 func generateTransactionInput() ([][]byte, [][]byte, [][]byte) {
