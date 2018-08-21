@@ -118,6 +118,10 @@ func generateTransactionInput() ([][]byte, [][]byte, [][]byte) {
 	h.Write(newData[1])
 	writeKeys = append(writeKeys, h.Sum(nil))
 
+	token = make([]byte, 3)
+	rand.Read(token)
+	readKeys = append(readKeys, token)
+
 	return writeKeys, newData, readKeys
 }
 
