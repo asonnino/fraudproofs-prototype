@@ -67,15 +67,15 @@ func TestBlock(test *testing.T) {
 		test.Error("fraud proof does not check")
 	}
 
-	// verify corrupted fraud proof (corrupted chunks proof)
-	corruptedFp := corruptFraudproofChunks(goodFp)
+	// verify corrupted fraud proof (corrupted state proof)
+	corruptedFp := corruptFraudproofState(goodFp)
 	ret = badBlock.VerifyFraudProof(*corruptedFp)
 	if ret != false {
 		test.Error("invalid fraud proof should not check")
 	}
 
-	// verify corrupted fraud proof (corrupted state proof)
-	corruptedFp = corruptFraudproofState(goodFp)
+	// verify corrupted fraud proof (corrupted chunks proof)
+	corruptedFp = corruptFraudproofChunks(goodFp)
 	ret = badBlock.VerifyFraudProof(*corruptedFp)
 	if ret != false {
 		test.Error("invalid fraud proof should not check")
