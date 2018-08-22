@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"errors"
 	"crypto/sha256"
+	"fmt"
 )
 
 // Step defines the interval on which to compute intermediate state roots (must be a positive integer)
@@ -105,12 +106,8 @@ func makeChunks(chunkSize int, t []Transaction, s [][]byte) ([][]byte, map[[256]
 	var buff []byte
 	buffMap := make(map[[256]byte]int)
 	for i := 0; i < len(t); i++ {
-		for j := 0; j < len(t[i].writeKeys); j++ {
-			buffMap[t[i].HashKey()] = len(buff)
-			buff = append(buff, t[i].writeKeys[j]...)
-			buff = append(buff, t[i].newData[j]...)
-		}
-
+		buffMap[t[i].HashKey()] = len(buff)
+		buff = append(buff, t[i].Serialize()...)
 		if i != 0 && i%Step == 0 {
 			buff = append(buff, interStateRoots[0]...)
 			interStateRoots = interStateRoots[1:]
@@ -121,13 +118,23 @@ func makeChunks(chunkSize int, t []Transaction, s [][]byte) ([][]byte, map[[256]
 	}
 
 	var chunk []byte
-	chunks := make([][]byte, 0, len(buff)/chunkSize+1)
-	for len(buff) >= chunkSize {
-		chunk, buff = buff[:chunkSize], buff[chunkSize:]
+	size := chunkSize - 1
+	chunks := make([][]byte, 0, len(buff)/size+1)
+	for len(buff) >= size {
+		chunk, buff = buff[:size], buff[size:]
+		chunk = append([]byte{0x0}, chunk...)
 		chunks = append(chunks, chunk)
 	}
 	if len(buff) > 0 {
-		chunks = append(chunks, buff[:])
+		chunk = buff[:]
+		chunk = append([]byte{0x0}, chunk...)
+		chunks = append(chunks, chunk)
+	}
+
+	for i := len(t)-1; i >= 0; i-- {
+		chunkIndex := buffMap[t[i].HashKey()] / chunksSize
+		chunkPosition := byte(buffMap[t[i].HashKey()] % chunksSize)
+		chunks[chunkIndex][0] = chunkPosition
 	}
 
 	return chunks, buffMap, nil
@@ -147,30 +154,45 @@ func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error)
 			t := rebuiltBlock.transactions[i*Step:(i+1)*Step]
 
 			// 2. generate Merkle proofs of the keys-values contained in the transaction
-			var keys [][]byte
-			var data [][]byte
+			var writeKeys, oldData, readKeys, readData [][]byte
 			for j := 0; j < len(t); j++ {
-				for k := 0; k < len(t); k++ {
-					keys = append(keys, t[j].writeKeys[k])
-					data = append(data, t[j].newData[k])
+				for k := 0; k < len(t[j].writeKeys); k++ {
+					writeKeys = append(writeKeys, t[j].writeKeys[k])
+					oldData = append(oldData, t[j].oldData[k])
+				}
+				for k := 0; k < len(t[j].readKeys); k++ {
+					readKeys = append(readKeys, t[j].readKeys[k])
+					readData = append(readData, t[j].readData[k])
 				}
 			}
 
-			proofstate := make([][][]byte, len(keys))
-			for j := 0; j < len(keys); j++ {
-				proof, err := stateTree.Prove(keys[j])
+			proofstate := make([][][]byte, len(writeKeys))
+			for j := 0; j < len(writeKeys); j++ {
+				proof, err := stateTree.ProveCompact(writeKeys[j])
 				if err != nil {
 					return nil, err
 				}
 				proofstate[j] = proof
 			}
 
-			// 3. generate Merkle proofs of the transactions, previous state root, and next state root
+			// 3. get chunks concerned by the proof
+			// TODO compact makeChunks and getChunksIndexes
 			chunksIndexes, _, err := b.getChunksIndexes(t)
 			if err != nil {
 				return nil, err
 			}
+			chunks, _, err := makeChunks(chunksSize, b.transactions, b.interStateRoots)
+			if err != nil {
+				return nil, err
+			}
+			var concernedChunks [][]byte
+			for j := 0; j < len(chunksIndexes); j++ {
+				concernedChunks = append(concernedChunks, chunks[chunksIndexes[j]])
+			}
+
+			// 4. generate Merkle proofs of the transactions, previous state root, and next state root
 			proofChunks := make([][][]byte, len(chunksIndexes))
+			var numOfLeaves uint64
 			for j := 0; j < len(chunksIndexes); j++ {
 				// merkletree.Tree cannot call SetIndex on Tree if Tree has not been reset
 				// a dirty workaround is to copy the data tree
@@ -183,15 +205,32 @@ func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error)
 				if err != nil {
 					return nil, err
 				}
-				_, proof, _, _ := tmpDataTree.Prove()
+				_, proof, _, leaves := tmpDataTree.Prove()
+				numOfLeaves = leaves
 				proofChunks[j] = proof
 			}
 
+
+			// ---
+			// TODO remove
+			var newData [][]byte
+			for j := 0; j < len(t); j++ {
+				for k := 0; k < len(t[j].writeKeys); k++ {
+					newData = append(newData, t[j].newData[k])
+				}
+			}
+
 			return &FraudProof{
-				keys,
-				data,
+				writeKeys,
+				oldData,
+				newData,
+				readKeys,
+				readData,
 				proofstate,
-				proofChunks}, nil
+				concernedChunks,
+				proofChunks,
+				chunksIndexes,
+				numOfLeaves}, nil
 		}
 	}
 
@@ -225,27 +264,31 @@ func (b *Block) getChunksIndexes(t []Transaction) ([]uint64, uint64, error) {
 // VerifyFraudProof verifies whether or not a fraud proof is valid.
 func (b *Block) VerifyFraudProof(fp FraudProof) bool {
 	// 1. check that the transactions, prevStateRoot, nextStateRoot are in the data tree
-	chunksIndexes, numOfIndexes, _ := b.getChunksIndexes(b.transactions)
-	for i := 0; i<len(fp.proofChunks); i++ {
-		ret := merkletree.VerifyProof(sha256.New(), b.dataRoot, fp.proofChunks[i], chunksIndexes[i], numOfIndexes)
+	for i := 0; i < len(fp.proofChunks); i++ {
+		ret := merkletree.VerifyProof(sha256.New(), b.dataRoot, fp.proofChunks[i], fp.chunksIndexes[i], fp.numOfLeaves)
 		if ret != true {
 			return false
 		}
 	}
 
-	// 2. check keys-values contained in the transaction are in the state tree
-	// in theory, this is not needed, as this check is performed automatically by 3.
-	for i := 0; i < len(fp.keys); i++ {
-		ret := smt.VerifyProof(fp.proofState[i], b.stateRoot, fp.keys[i], fp.data[i], sha256.New())
-		if ret != true {
-			return false
-		}
+	// 2. extract new data from chunks
+	fmt.Println(fp.proofChunks[0])
+	fmt.Println(fp.newData)
+	fmt.Println(fp.chunks)
+	for i := 0; i < len(fp.proofChunks); i++ {
+		// TODO
 	}
 
-	// 3. check keys-values contained in the transaction are in the state tree
+	// 3. check keys-values contained in the transaction are in the state tree for old data
 	subtree := smt.NewDeepSparseMerkleSubTree(smt.NewSimpleMap(), sha256.New())
-	for i := 0; i < len(fp.keys); i++ {
-		subtree.AddBranches(fp.proofState[i], fp.keys[i],fp.data[i], true)
+	for i := 0; i < len(fp.writeKeys); i++ {
+		proof, err := smt.DecompactProof(fp.proofState[i], sha256.New())
+		if err != nil {
+			return false
+		}
+		subtree.AddBranches(proof, fp.writeKeys[i],fp.oldData[i], true)
+		// 4. update keys with new data
+		subtree.Update(fp.writeKeys[i], fp.newData[i])
 	}
 	if bytes.Compare(b.stateRoot, subtree.Root()) != 0 {
 		return false

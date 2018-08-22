@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"github.com/NebulousLabs/merkletree"
 	"github.com/jinzhu/copier"
+	"bytes"
 )
 
 
@@ -18,9 +19,18 @@ func TestTransaction(test *testing.T) {
 	}
 
 	// create bad transaction
-	_, err =  NewTransaction(generateTransactionInput())
+	goodT, err :=  NewTransaction(generateTransactionInput())
 	if err != nil {
 		test.Error(err)
+	}
+
+	// serialize and deserialize
+	buff := goodT.Serialize()
+	t, err := Deserialize(buff)
+	if err != nil {
+		test.Error(err)
+	} else if bytes.Compare(t.Serialize(), buff) != 0 {
+		test.Error("transaction not serialized and deserialize correctly")
 	}
 }
 
@@ -67,15 +77,15 @@ func TestBlock(test *testing.T) {
 		test.Error("fraud proof does not check")
 	}
 
-	// verify corrupted fraud proof (corrupted state proof)
-	corruptedFp := corruptFraudproofState(goodFp)
+	// verify corrupted fraud proof (corrupted chunks proof)
+	corruptedFp := corruptFraudproofChunks(goodFp)
 	ret = badBlock.VerifyFraudProof(*corruptedFp)
 	if ret != false {
 		test.Error("invalid fraud proof should not check")
 	}
 
-	// verify corrupted fraud proof (corrupted chunks proof)
-	corruptedFp = corruptFraudproofChunks(goodFp)
+	// verify corrupted fraud proof (corrupted state proof)
+	corruptedFp = corruptFraudproofState(goodFp)
 	ret = badBlock.VerifyFraudProof(*corruptedFp)
 	if ret != false {
 		test.Error("invalid fraud proof should not check")
@@ -113,34 +123,43 @@ func TestBlockchain(test *testing.T) {
 // ------------------ helpers ------------------ //
 
 
-func generateTransactionInput() ([][]byte, [][]byte, [][]byte) {
-	h := sha256.New()
-	var writeKeys, newData, readKeys [][]byte
+func generateTransactionInput() ([][]byte, [][]byte, [][]byte, [][]byte, [][]byte, []byte) {
+	var writeKeys, newData, oldData, readKeys, readData [][]byte
+	const numWriteKeys = 2
+	const numReadKeys = numWriteKeys
+	const sizeKeys = 3
+	const sizeData = 3
 
-	token := make([]byte, 3)
-	rand.Read(token)
-	newData = append(newData, token)
-	token = make([]byte, 3)
-	rand.Read(token)
-	newData = append(newData, token)
+	for i := 0; i < numWriteKeys; i++ {
+		token := make([]byte, sizeKeys)
+		rand.Read(token)
+		writeKeys = append(writeKeys, token)
 
-	h.Write(newData[0])
-	writeKeys = append(writeKeys, h.Sum(nil))
-	h.Reset()
-	h.Write(newData[1])
-	writeKeys = append(writeKeys, h.Sum(nil))
+		token = make([]byte, sizeData)
+		rand.Read(token)
+		newData = append(newData, token)
 
-	token = make([]byte, 3)
-	rand.Read(token)
-	readKeys = append(readKeys, token)
+		token = make([]byte, sizeData)
+		rand.Read(token)
+		oldData = append(oldData, token)
+	}
+	for i := 0; i < numReadKeys; i++ {
+		token := make([]byte, sizeKeys)
+		rand.Read(token)
+		readKeys = append(readKeys, token)
 
-	return writeKeys, newData, readKeys
+		token = make([]byte, sizeData)
+		rand.Read(token)
+		readData = append(readData, token)
+	}
+
+	return writeKeys, newData, oldData, readKeys, readData, []byte{}
 }
 
-func generateCorruptedTransactionInput() ([][]byte, [][]byte, [][]byte) {
-	writeKeys, newData, readKeys := generateTransactionInput()
+func generateCorruptedTransactionInput() ([][]byte, [][]byte, [][]byte, [][]byte, [][]byte, []byte) {
+	writeKeys, newData, oldData, readKeys, readData, arbitrary := generateTransactionInput()
 	writeKeys = writeKeys[1:]
-	return writeKeys, newData, readKeys
+	return writeKeys, newData, oldData, readKeys, readData, arbitrary
 }
 
 func corruptTransaction(t *Transaction) (*Transaction) {
