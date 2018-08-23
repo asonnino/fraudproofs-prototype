@@ -235,7 +235,12 @@ func (b *Block) getChunksIndexes(t []Transaction) ([]uint64, uint64, error) {
 
 	var chunksIndexes []uint64
 	for i := 0; i < len(t); i++ {
-		chunksIndexes = append(chunksIndexes, uint64(buffMap[t[i].HashKey()]/chunksSize))
+		index := uint64(buffMap[t[i].HashKey()]/chunksSize)
+		chunksIndexes = append(chunksIndexes, index)
+		length := int(binary.LittleEndian.Uint16(t[i].Serialize()[:MaxSize]))
+		if length > (len(chunks[index]) - buffMap[t[i].HashKey()]%chunksSize) {
+			chunksIndexes = append(chunksIndexes, index+1)
+		}
 	}
 
 	uniquesMap := make(map[uint64]bool)
@@ -268,7 +273,8 @@ func (b *Block) VerifyFraudProof(fp FraudProof) bool {
 		buff = append(buff, fp.chunks[i][1:]...)
 	}
 	var newData [][]byte
-	for i := 0; len(buff) >= 0; i++ {
+	buff = buff[indexes[0]:]
+	for i := 0; len(buff) >= MaxSize; i++ {
 		length := int(binary.LittleEndian.Uint16(buff[:MaxSize]))
 		if len(buff) < length {
 			break

@@ -127,8 +127,8 @@ func generateTransactionInput() ([][]byte, [][]byte, [][]byte, [][]byte, [][]byt
 	var writeKeys, newData, oldData, readKeys, readData [][]byte
 	const numWriteKeys = 2
 	const numReadKeys = numWriteKeys
-	const sizeKeys = 1
-	const sizeData = 2
+	const sizeKeys = 32
+	const sizeData = 10
 
 	for i := 0; i < numWriteKeys; i++ {
 		token := make([]byte, sizeKeys)

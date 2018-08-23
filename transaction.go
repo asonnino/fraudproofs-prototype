@@ -23,8 +23,6 @@ type Transaction struct {
 
 // NewTransaction creates a new transaction with the given keys and data.
 func NewTransaction(writeKeys, newData, oldData, readKeys, readData [][]byte, arbitrary []byte) (*Transaction, error) {
-	//size := make([]byte, MaxSize)
-	//binary.LittleEndian.PutUint16(size, uint16(len(writeKeys)+len(newData)+len(oldData)+len(readKeys)+len(readData)))
 	t := &Transaction{
 		writeKeys,newData,oldData,readKeys,readData,arbitrary}
 	err := t.CheckTransaction()
@@ -55,20 +53,6 @@ func (t *Transaction) HashKey() [256]byte {
 	copy(hashKey[:], h.Sum(nil)[:])
 	return hashKey
 }
-
-/*
-func (t *Transaction) Size() int {
-	size := 0
-	for i := 0; i < len(t.writeKeys); i++ {
-		size += len(t.writeKeys[i])
-		size += len(t.newData[i])
-		size += len(t.oldData[i])
-		size += len(t.readKeys[i])
-		size += len(t.readData[i])
-	}
-	return size
-}
-*/
 
 // Serialize converts a transaction into an array of bytes.
 // TODO: replace by a proper protocol buffer
