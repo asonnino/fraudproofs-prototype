@@ -284,7 +284,6 @@ func (b *Block) VerifyFraudProof(fp FraudProof) bool {
 		newData = append(newData, t.newData...)
 	}
 
-
 	// 3. check keys-values contained in the transaction are in the state tree for old data
 	subtree := smt.NewDeepSparseMerkleSubTree(smt.NewSimpleMap(), sha256.New())
 	for i := 0; i < len(fp.writeKeys); i++ {
