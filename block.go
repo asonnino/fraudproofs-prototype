@@ -6,7 +6,7 @@ import (
 	"bytes"
 	"errors"
 	"crypto/sha256"
-	"fmt"
+	"encoding/binary"
 )
 
 // Step defines the interval on which to compute intermediate state roots (must be a positive integer)
@@ -176,7 +176,7 @@ func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error)
 			}
 
 			// 3. get chunks concerned by the proof
-			// TODO compact makeChunks and getChunksIndexes
+			// TODO compact 'makeChunks' and 'getChunksIndexes'
 			chunksIndexes, _, err := b.getChunksIndexes(t)
 			if err != nil {
 				return nil, err
@@ -210,20 +210,9 @@ func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error)
 				proofChunks[j] = proof
 			}
 
-
-			// ---
-			// TODO remove
-			var newData [][]byte
-			for j := 0; j < len(t); j++ {
-				for k := 0; k < len(t[j].writeKeys); k++ {
-					newData = append(newData, t[j].newData[k])
-				}
-			}
-
 			return &FraudProof{
 				writeKeys,
 				oldData,
-				newData,
 				readKeys,
 				readData,
 				proofstate,
@@ -272,12 +261,23 @@ func (b *Block) VerifyFraudProof(fp FraudProof) bool {
 	}
 
 	// 2. extract new data from chunks
-	fmt.Println(fp.proofChunks[0])
-	fmt.Println(fp.newData)
-	fmt.Println(fp.chunks)
-	for i := 0; i < len(fp.proofChunks); i++ {
-		// TODO
+	var indexes []int
+	var buff []byte
+	for i := 0; i < len(fp.chunks); i++ {
+		indexes = append(indexes, int(fp.chunks[i][0]))
+		buff = append(buff, fp.chunks[i][1:]...)
 	}
+	var newData [][]byte
+	for i := 0; len(buff) >= 0; i++ {
+		length := int(binary.LittleEndian.Uint16(buff[:MaxSize]))
+		if len(buff) < length {
+			break
+		}
+		t, _ := Deserialize(buff[:length])
+		buff = buff[length:]
+		newData = append(newData, t.newData...)
+	}
+
 
 	// 3. check keys-values contained in the transaction are in the state tree for old data
 	subtree := smt.NewDeepSparseMerkleSubTree(smt.NewSimpleMap(), sha256.New())
@@ -288,7 +288,7 @@ func (b *Block) VerifyFraudProof(fp FraudProof) bool {
 		}
 		subtree.AddBranches(proof, fp.writeKeys[i],fp.oldData[i], true)
 		// 4. update keys with new data
-		subtree.Update(fp.writeKeys[i], fp.newData[i])
+		subtree.Update(fp.writeKeys[i], newData[i])
 	}
 	if bytes.Compare(b.stateRoot, subtree.Root()) != 0 {
 		return false

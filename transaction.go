@@ -56,13 +56,29 @@ func (t *Transaction) HashKey() [256]byte {
 	return hashKey
 }
 
+/*
+func (t *Transaction) Size() int {
+	size := 0
+	for i := 0; i < len(t.writeKeys); i++ {
+		size += len(t.writeKeys[i])
+		size += len(t.newData[i])
+		size += len(t.oldData[i])
+		size += len(t.readKeys[i])
+		size += len(t.readData[i])
+	}
+	return size
+}
+*/
+
 // Serialize converts a transaction into an array of bytes.
 // TODO: replace by a proper protocol buffer
 func (t *Transaction) Serialize() []byte {
 	var buff []byte
+
 	numKeys := make([]byte, MaxSize)
 	binary.LittleEndian.PutUint16(numKeys, uint16(len(t.writeKeys)))
 	buff = append(buff, numKeys...)
+
 	for i := 0; i < len(t.writeKeys); i++ {
 		size := make([]byte, MaxSize)
 		binary.LittleEndian.PutUint16(size, uint16(len(t.writeKeys[i])))
@@ -89,6 +105,11 @@ func (t *Transaction) Serialize() []byte {
 		buff = append(buff, size...)
 		buff = append(buff, t.readData[i]...)
 	}
+
+	length := make([]byte, MaxSize)
+	binary.LittleEndian.PutUint16(length, uint16(len(buff)+MaxSize))
+	buff = append(length, buff...)
+
 	return buff
 }
 
@@ -99,6 +120,7 @@ func Deserialize(buff []byte) (*Transaction, error) {
 
 	tmp, size := make([]byte, len(buff)), uint16(0)
 	copy(tmp, buff)
+	_, tmp = binary.LittleEndian.Uint16(tmp[:MaxSize]), tmp[MaxSize:] // length
 	numKeys, tmp := binary.LittleEndian.Uint16(tmp[:MaxSize]), tmp[MaxSize:]
 	for i := 0; i < int(numKeys); i++ {
 		size, tmp = binary.LittleEndian.Uint16(tmp[:MaxSize]), tmp[MaxSize:]

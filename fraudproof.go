@@ -6,7 +6,6 @@ type FraudProof struct {
 	// data structure
 	writeKeys [][]byte
 	oldData [][]byte
-	newData [][]byte
 	readKeys [][]byte
 	readData [][]byte
 	proofState [][][]byte
