@@ -1,13 +1,15 @@
 package fraudproofs
 
 import (
-	"testing"
+	"bytes"
 	"crypto/sha256"
-	"github.com/musalbas/smt"
-	"math/rand"
+	"fmt"
 	"github.com/NebulousLabs/merkletree"
 	"github.com/jinzhu/copier"
-	"bytes"
+	"github.com/musalbas/smt"
+	"math/rand"
+	"testing"
+	"time"
 )
 
 
@@ -64,7 +66,11 @@ func TestBlock(test *testing.T) {
 
 	// check bad block (corrupted intermediate state)
 	badBlock = corruptBlockInterStates(goodBlock)
+	start := time.Now()
 	goodFp, err := badBlock.CheckBlock(stateTree)
+	t := time.Now()
+	elapsed := t.Sub(start)
+	fmt.Println("generate proof: ", elapsed)
 	if err != nil {
 		test.Error(err)
 	} else if goodFp == nil {
@@ -72,7 +78,11 @@ func TestBlock(test *testing.T) {
 	}
 
 	// verify fraud proof of bad block
+	start = time.Now()
 	ret := badBlock.VerifyFraudProof(*goodFp)
+	t = time.Now()
+	elapsed = t.Sub(start)
+	fmt.Println("verify proof: ", elapsed)
 	if ret != true {
 		test.Error("fraud proof does not check")
 	}
@@ -125,31 +135,51 @@ func TestBlockchain(test *testing.T) {
 
 func generateTransactionInput() ([][]byte, [][]byte, [][]byte, [][]byte, [][]byte, []byte) {
 	var writeKeys, newData, oldData, readKeys, readData [][]byte
+
+	// average Ethereum transaction size (225B)
 	const numWriteKeys = 2
 	const numReadKeys = numWriteKeys
-	const sizeKeys = 32
-	const sizeData = 10
+	const sizeKeys = 1
+	const sizeData = 33
 
 	for i := 0; i < numWriteKeys; i++ {
 		token := make([]byte, sizeKeys)
-		rand.Read(token)
+		//rand.Read(token)
+		for j := 0; j < len(token); j++ {
+			token[j] = 1
+		}
 		writeKeys = append(writeKeys, token)
 
 		token = make([]byte, sizeData)
-		rand.Read(token)
+		//rand.Read(token)
+		for j := 0; j < len(token); j++ {
+			token[j] = 2
+		}
 		newData = append(newData, token)
 
 		token = make([]byte, sizeData)
-		rand.Read(token)
+		//rand.Read(token)
+		for j := 0; j < len(token); j++ {
+			token[j] = 3
+		}
 		oldData = append(oldData, token)
 	}
 	for i := 0; i < numReadKeys; i++ {
 		token := make([]byte, sizeKeys)
 		rand.Read(token)
+		//fmt.Println(len(token), token)
+		//for j := 0; j < len(token); j++ {
+		//	token[j] = byte(i)
+		//}
+		//fmt.Println(len(token), token)
 		readKeys = append(readKeys, token)
 
 		token = make([]byte, sizeData)
-		rand.Read(token)
+		//rand.Read(token)
+		for j := 0; j < len(token); j++ {
+			token[j] = 5
+		}
+		//fmt.Println(token)
 		readData = append(readData, token)
 	}
 
@@ -168,10 +198,15 @@ func corruptTransaction(t *Transaction) (*Transaction) {
 }
 
 func generateBlockInput() ([]Transaction, *smt.SparseMerkleTree) {
-	t1, _ := NewTransaction(generateTransactionInput())
-	t2, _ := NewTransaction(generateTransactionInput())
+	// average Ethereum transactions per block (if block of 1MB)
+	const numTransactions = 1111 // 4444
+	t := make([]Transaction, numTransactions)
+	for i := 0; i < len(t); i++ {
+		tmp, _ := NewTransaction(generateTransactionInput())
+		t[i] = *tmp
+	}
 	stateTree := smt.NewSparseMerkleTree(smt.NewSimpleMap(), sha256.New())
-	return []Transaction{*t1,*t2}, stateTree
+	return t, stateTree
 }
 
 func generateCorruptedBlockInput() ([]Transaction, *smt.SparseMerkleTree) {
