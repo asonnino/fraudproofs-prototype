@@ -6,8 +6,8 @@ import (
 	"errors"
 	"github.com/NebulousLabs/merkletree"
 	//"crypto/sha256"
-	"github.com/minio/sha256-simd"
-	//"crypto/sha512"
+	//"github.com/minio/sha256-simd"
+	"crypto/sha512"
 	"github.com/musalbas/smt"
 )
 
@@ -43,7 +43,7 @@ func NewBlock(t []Transaction, stateTree *smt.SparseMerkleTree) (*Block, error) 
 		return nil, err
 	}
 
-	dataTree := merkletree.New(sha256.New())
+	dataTree := merkletree.New(sha512.New512_256())
 	dataRoot, err := fillDataTree(t, interStateRoots, dataTree)
 	if err != nil {
 		return nil, err
@@ -199,7 +199,7 @@ func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error)
 			for j := 0; j < len(chunksIndexes); j++ {
 				// merkletree.Tree cannot call SetIndex on Tree if Tree has not been reset
 				// a dirty workaround is to copy the data tree
-				tmpDataTree := merkletree.New(sha256.New())
+				tmpDataTree := merkletree.New(sha512.New512_256())
 				err = tmpDataTree.SetIndex(chunksIndexes[j])
 				if err != nil {
 					return nil, err
@@ -269,7 +269,7 @@ func (b *Block) getChunksIndexes(t []Transaction) ([]uint64, uint64, error) {
 func (b *Block) VerifyFraudProof(fp FraudProof) bool {
 	// 1. check that the transactions, prevStateRoot, nextStateRoot are in the data tree
 	for i := 0; i < len(fp.proofChunks); i++ {
-		ret := merkletree.VerifyProof(sha256.New(), b.dataRoot, fp.proofChunks[i], fp.chunksIndexes[i], fp.numOfLeaves)
+		ret := merkletree.VerifyProof(sha512.New512_256(), b.dataRoot, fp.proofChunks[i], fp.chunksIndexes[i], fp.numOfLeaves)
 		if ret != true {
 			return false
 		}
@@ -301,9 +301,9 @@ func (b *Block) VerifyFraudProof(fp FraudProof) bool {
 	//fmt.Println(len(fp.writeKeys), fp.writeKeys)
 
 	// 3. check keys-values contained in the transaction are in the state tree for old data
-	subtree := smt.NewDeepSparseMerkleSubTree(smt.NewSimpleMap(), sha256.New())
+	subtree := smt.NewDeepSparseMerkleSubTree(smt.NewSimpleMap(), sha512.New512_256())
 	for i := 0; i < len(fp.writeKeys); i++ {
-		proof, err := smt.DecompactProof(fp.proofState[i], sha256.New())
+		proof, err := smt.DecompactProof(fp.proofState[i], sha512.New512_256())
 		if err != nil {
 			return false
 		}

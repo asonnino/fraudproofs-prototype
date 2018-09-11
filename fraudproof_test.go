@@ -3,7 +3,8 @@ package fraudproofs
 import (
 	"bytes"
 	//"crypto/sha256"
-	"github.com/minio/sha256-simd"
+	//"github.com/minio/sha256-simd"
+	"crypto/sha512"
 	"fmt"
 	"github.com/NebulousLabs/merkletree"
 	"github.com/jinzhu/copier"
@@ -227,13 +228,13 @@ func corruptTransaction(t *Transaction) (*Transaction) {
 
 func generateBlockInput() ([]Transaction, *smt.SparseMerkleTree) {
 	// average Ethereum transactions per block (if block of 1MB)
-	const numTransactions = 1111 // 4444
+	const numTransactions = 4444 // 4444
 	t := make([]Transaction, numTransactions)
 	for i := 0; i < len(t); i++ {
 		tmp, _ := NewTransaction(generateTransactionInput())
 		t[i] = *tmp
 	}
-	stateTree := smt.NewSparseMerkleTree(smt.NewSimpleMap(), sha256.New())
+	stateTree := smt.NewSparseMerkleTree(smt.NewSimpleMap(), sha512.New512_256())
 	return t, stateTree
 }
 
@@ -243,7 +244,7 @@ func generateCorruptedBlockInput() ([]Transaction, *smt.SparseMerkleTree) {
 
 	t1 = corruptTransaction(t1)
 
-	stateTree := smt.NewSparseMerkleTree(smt.NewSimpleMap(), sha256.New())
+	stateTree := smt.NewSparseMerkleTree(smt.NewSimpleMap(), sha512.New512_256())
 	return []Transaction{*t1,*t2}, stateTree
 }
 
@@ -255,11 +256,11 @@ func generateBlockWithCorruptedTransactions() (*Block) {
 }
 
 func corruptBlockInterStates(b *Block) (*Block) {
-	h := sha256.New()
+	h := sha512.New512_256()
 	h.Write([]byte("random"))
 	b.interStateRoots[0] = h.Sum(nil)
 
-	dataTree := merkletree.New(sha256.New())
+	dataTree := merkletree.New(sha512.New512_256())
 	dataRoot, _ := fillDataTree(b.transactions, b.interStateRoots, dataTree)
 
 	return &Block{
@@ -274,7 +275,7 @@ func corruptBlockInterStates(b *Block) (*Block) {
 func corruptFraudproofChunks(fp *FraudProof) (*FraudProof) {
 	copyFp := &FraudProof{}
 	copier.Copy(copyFp, fp)
-	h := sha256.New()
+	h := sha512.New512_256()
 	h.Write([]byte("random"))
 	copyFp.proofChunks[0] = [][]byte{h.Sum(nil), h.Sum(nil)}
 	return copyFp
@@ -283,7 +284,7 @@ func corruptFraudproofChunks(fp *FraudProof) (*FraudProof) {
 func corruptFraudproofState(fp *FraudProof) (*FraudProof) {
 	copyFp := &FraudProof{}
 	copier.Copy(copyFp, fp)
-	h := sha256.New()
+	h := sha512.New512_256()
 	h.Write([]byte("random"))
 	copyFp.proofState[0] = [][]byte{h.Sum(nil), h.Sum(nil)}
 	return copyFp
