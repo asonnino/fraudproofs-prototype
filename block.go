@@ -65,7 +65,7 @@ func fillStateTree(t []Transaction, stateTree *smt.SparseMerkleTree) ([][]byte, 
 	var stateRoot []byte
 	var interStateRoots [][]byte
 	for i := 0; i < len(t); i++ {
-		//fmt.Println(len(t[i].Serialize()))
+		//fmt.Println("transaction size: ", len(t[i].Serialize()))
 		for j := 0; j < len(t[i].writeKeys); j++ {
 			root, err := stateTree.Update(t[i].writeKeys[j], t[i].newData[j])
 			if err != nil {
@@ -283,8 +283,8 @@ func (b *Block) VerifyFraudProof(fp FraudProof) bool {
 	// 2. extract new data from chunks
 	var indexes []int
 	var buff []byte
-	//fmt.Println()
-	//fmt.Println(fp.chunks)
+	fmt.Println()
+	fmt.Println(fp.chunks)
 	for i := 0; i < len(fp.chunks); i++ {
 		indexes = append(indexes, int(fp.chunks[i][0]))
 		buff = append(buff, fp.chunks[i][1:]...)
@@ -302,8 +302,8 @@ func (b *Block) VerifyFraudProof(fp FraudProof) bool {
 		buff = buff[length:]
 		newData = append(newData, t.newData...)
 	}
-	//fmt.Println(len(newData), newData)
-	//fmt.Println(len(fp.writeKeys), fp.writeKeys)
+	fmt.Println(len(newData), newData)
+	fmt.Println(len(fp.writeKeys), fp.writeKeys)
 
 	// 3. check keys-values contained in the transaction are in the state tree for old data
 	subtree := smt.NewDeepSparseMerkleSubTree(smt.NewSimpleMap(), sha256.New())

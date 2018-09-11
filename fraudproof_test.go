@@ -165,10 +165,10 @@ func generateTransactionInput() ([][]byte, [][]byte, [][]byte, [][]byte, [][]byt
 	var writeKeys, newData, oldData, readKeys, readData [][]byte
 
 	// average Ethereum transaction size (225B)
-	const numWriteKeys = 2
+	const numWriteKeys = 1
 	const numReadKeys = numWriteKeys
-	const sizeKeys = 1
-	const sizeData = 33
+	const sizeKeys = 32
+	const sizeData = 49
 
 	for i := 0; i < numWriteKeys; i++ {
 		token := make([]byte, sizeKeys)
