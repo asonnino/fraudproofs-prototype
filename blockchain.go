@@ -2,7 +2,8 @@ package fraudproofs
 
 import (
 	"github.com/musalbas/smt"
-	"crypto/sha256"
+	//"crypto/sha256"
+	"github.com/minio/sha256-simd"
 )
 
 // Blockchain is a simple blockchain.
