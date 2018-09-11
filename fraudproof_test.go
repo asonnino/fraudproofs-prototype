@@ -227,7 +227,7 @@ func corruptTransaction(t *Transaction) (*Transaction) {
 
 func generateBlockInput() ([]Transaction, *smt.SparseMerkleTree) {
 	// average Ethereum transactions per block (if block of 1MB)
-	const numTransactions = 4444 // 4444
+	const numTransactions = 1111 // 4444
 	t := make([]Transaction, numTransactions)
 	for i := 0; i < len(t); i++ {
 		tmp, _ := NewTransaction(generateTransactionInput())

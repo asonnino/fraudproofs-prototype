@@ -4,12 +4,11 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"github.com/NebulousLabs/merkletree"
 	//"crypto/sha256"
 	"github.com/minio/sha256-simd"
+	//"crypto/sha512"
 	"github.com/musalbas/smt"
-	"time"
 )
 
 // Step defines the interval on which to compute intermediate state roots (must be a positive integer)
@@ -145,11 +144,7 @@ func makeChunks(chunkSize int, t []Transaction, s [][]byte) ([][]byte, map[[256]
 
 // CheckBlock checks that the block is constructed correctly, and returns a fraud proof if it is not.
 func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error) {
-	start := time.Now()
 	rebuiltBlock, err := NewBlock(b.transactions, stateTree)
-	t := time.Now()
-	elapsed := t.Sub(start)
-	fmt.Println("t1: ", elapsed)
 	if err != nil {
 		return nil, err
 	}
@@ -283,8 +278,8 @@ func (b *Block) VerifyFraudProof(fp FraudProof) bool {
 	// 2. extract new data from chunks
 	var indexes []int
 	var buff []byte
-	fmt.Println()
-	fmt.Println(fp.chunks)
+	//fmt.Println()
+	//fmt.Println(fp.chunks)
 	for i := 0; i < len(fp.chunks); i++ {
 		indexes = append(indexes, int(fp.chunks[i][0]))
 		buff = append(buff, fp.chunks[i][1:]...)
@@ -302,8 +297,8 @@ func (b *Block) VerifyFraudProof(fp FraudProof) bool {
 		buff = buff[length:]
 		newData = append(newData, t.newData...)
 	}
-	fmt.Println(len(newData), newData)
-	fmt.Println(len(fp.writeKeys), fp.writeKeys)
+	//fmt.Println(len(newData), newData)
+	//fmt.Println(len(fp.writeKeys), fp.writeKeys)
 
 	// 3. check keys-values contained in the transaction are in the state tree for old data
 	subtree := smt.NewDeepSparseMerkleSubTree(smt.NewSimpleMap(), sha256.New())
