@@ -2,17 +2,20 @@ package fraudproofs
 
 import (
 	"bytes"
-	"crypto/sha256"
+	//"crypto/sha256"
+	"github.com/minio/sha256-simd"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"github.com/NebulousLabs/merkletree"
 	"github.com/musalbas/smt"
+	"time"
 )
 
 // Step defines the interval on which to compute intermediate state roots (must be a positive integer)
 const Step int = 2
 // ChunksSize defines the size of each chunk
-const chunksSize int = 32
+const chunksSize int = 256
 
 // Block is a block of the blockchain
 type Block struct {
@@ -61,7 +64,6 @@ func NewBlock(t []Transaction, stateTree *smt.SparseMerkleTree) (*Block, error) 
 func fillStateTree(t []Transaction, stateTree *smt.SparseMerkleTree) ([][]byte, []byte, error){
 	var stateRoot []byte
 	var interStateRoots [][]byte
-	//fmt.Println(len(t[0].Serialize()))
 	for i := 0; i < len(t); i++ {
 		//fmt.Println(len(t[i].Serialize()))
 		for j := 0; j < len(t[i].writeKeys); j++ {
@@ -143,7 +145,11 @@ func makeChunks(chunkSize int, t []Transaction, s [][]byte) ([][]byte, map[[256]
 
 // CheckBlock checks that the block is constructed correctly, and returns a fraud proof if it is not.
 func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error) {
+	start := time.Now()
 	rebuiltBlock, err := NewBlock(b.transactions, stateTree)
+	t := time.Now()
+	elapsed := t.Sub(start)
+	fmt.Println("t1: ", elapsed)
 	if err != nil {
 		return nil, err
 	}
@@ -212,8 +218,6 @@ func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error)
 				proofChunks[j] = proof
 			}
 
-			//fmt.Println(chunks)
-
 			return &FraudProof{
 				writeKeys,
 				oldData,
@@ -226,6 +230,7 @@ func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error)
 				numOfLeaves}, nil
 		}
 	}
+
 
 	return nil, nil
 }

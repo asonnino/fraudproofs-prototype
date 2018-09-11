@@ -1,9 +1,10 @@
 package fraudproofs
 
 import (
-	"errors"
-	"crypto/sha256"
+	//"crypto/sha256"
+	"github.com/minio/sha256-simd"
 	"encoding/binary"
+	"errors"
 )
 
 // MaxSize is the number of bytes dedicated to store the size of the transaction's fields.

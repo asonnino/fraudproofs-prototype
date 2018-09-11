@@ -2,7 +2,8 @@ package fraudproofs
 
 import (
 	"bytes"
-	"crypto/sha256"
+	//"crypto/sha256"
+	"github.com/minio/sha256-simd"
 	"fmt"
 	"github.com/NebulousLabs/merkletree"
 	"github.com/jinzhu/copier"
@@ -66,11 +67,7 @@ func TestBlock(test *testing.T) {
 
 	// check bad block (corrupted intermediate state)
 	badBlock = corruptBlockInterStates(goodBlock)
-	start := time.Now()
 	goodFp, err := badBlock.CheckBlock(stateTree)
-	t := time.Now()
-	elapsed := t.Sub(start)
-	fmt.Println("generate proof: ", elapsed)
 	if err != nil {
 		test.Error(err)
 	} else if goodFp == nil {
@@ -78,11 +75,7 @@ func TestBlock(test *testing.T) {
 	}
 
 	// verify fraud proof of bad block
-	start = time.Now()
 	ret := badBlock.VerifyFraudProof(*goodFp)
-	t = time.Now()
-	elapsed = t.Sub(start)
-	fmt.Println("verify proof: ", elapsed)
 	if ret != true {
 		test.Error("fraud proof does not check")
 	}
@@ -126,6 +119,41 @@ func TestBlockchain(test *testing.T) {
 	_, err = blockchain.Append(generateBlockWithCorruptedTransactions())
 	if err == nil {
 		test.Error("should return an error")
+	}
+}
+
+func TestTiming(test *testing.T) {
+	// create good block
+	goodTransaction, stateTree := generateBlockInput()
+	goodBlock, err :=  NewBlock(goodTransaction, stateTree)
+	if err != nil {
+		test.Error(err)
+	}
+
+	// check bad block (corrupted intermediate state)
+	goodBlock = corruptBlockInterStates(goodBlock)
+
+	start := time.Now()
+	goodFp, err := goodBlock.CheckBlock(stateTree)
+	t := time.Now()
+	elapsed := t.Sub(start)
+	fmt.Println("generate proof: ", elapsed)
+
+	if err != nil {
+		test.Error(err)
+	} else if goodFp == nil {
+		test.Error("should return a fraud proof")
+	}
+
+	// verify fraud proof of bad block
+	start = time.Now()
+	ret := goodBlock.VerifyFraudProof(*goodFp)
+	t = time.Now()
+	elapsed = t.Sub(start)
+	fmt.Println("verify proof: ", elapsed)
+
+	if ret != true {
+		test.Error("fraud proof does not check")
 	}
 }
 
@@ -199,7 +227,7 @@ func corruptTransaction(t *Transaction) (*Transaction) {
 
 func generateBlockInput() ([]Transaction, *smt.SparseMerkleTree) {
 	// average Ethereum transactions per block (if block of 1MB)
-	const numTransactions = 1111 // 4444
+	const numTransactions = 4444 // 4444
 	t := make([]Transaction, numTransactions)
 	for i := 0; i < len(t); i++ {
 		tmp, _ := NewTransaction(generateTransactionInput())
