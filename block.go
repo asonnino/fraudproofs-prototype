@@ -2,12 +2,12 @@ package fraudproofs
 
 import (
 	"bytes"
-	//"crypto/sha256"
-	"github.com/minio/sha256-simd"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"github.com/NebulousLabs/merkletree"
+	//"crypto/sha256"
+	"github.com/minio/sha256-simd"
 	"github.com/musalbas/smt"
 	"time"
 )
