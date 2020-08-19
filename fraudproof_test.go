@@ -286,6 +286,6 @@ func corruptFraudproofState(fp *FraudProof) (*FraudProof) {
 	copier.Copy(copyFp, fp)
 	h := sha512.New512_256()
 	h.Write([]byte("random"))
-	copyFp.proofState[0] = [][]byte{h.Sum(nil), h.Sum(nil)}
+	copyFp.proofState[0].SideNodes = [][]byte{h.Sum(nil), h.Sum(nil)}
 	return copyFp
 }
