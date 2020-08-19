@@ -3,7 +3,8 @@ package fraudproofs
 import (
 	"github.com/musalbas/smt"
 	//"crypto/sha256"
-	"github.com/minio/sha256-simd"
+	//"github.com/minio/sha256-simd"
+	"crypto/sha512"
 )
 
 // Blockchain is a simple blockchain.
@@ -18,7 +19,7 @@ type Blockchain struct {
 
 // NewBlockchain creates an empty blockchain.
 func NewBlockchain() *Blockchain {
-	return &Blockchain{0,nil, smt.NewSparseMerkleTree(smt.NewSimpleMap(), sha256.New())}
+	return &Blockchain{0,nil, smt.NewSparseMerkleTree(smt.NewSimpleMap(), sha512.New512_256())}
 }
 
 // Append appends a block to the blockchain or returns a fraud proof if the block is not constructed correctly.

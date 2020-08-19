@@ -4,7 +4,8 @@ import (
 	"encoding/binary"
 	"errors"
 	//"crypto/sha256"
-	"github.com/minio/sha256-simd"
+	//"github.com/minio/sha256-simd"
+	"crypto/sha512"
 )
 
 // MaxSize is the number of bytes dedicated to store the size of the transaction's fields.
@@ -49,7 +50,7 @@ func (t *Transaction) CheckTransaction() (error) {
 // HashKey creates a compact representation of a transaction
 func (t *Transaction) HashKey() [256]byte {
 	var hashKey [256]byte
-	h := sha256.New()
+	h := sha512.New512_256()
 	h.Write(t.Serialize())
 	copy(hashKey[:], h.Sum(nil)[:])
 	return hashKey
