@@ -168,7 +168,7 @@ func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error)
 				}
 			}
 
-			proofstate := make([][][]byte, len(writeKeys))
+			proofstate := make([]smt.SparseCompactMerkleProof, len(writeKeys))
 			for j := 0; j < len(writeKeys); j++ {
 				proof, err := stateTree.ProveCompact(writeKeys[j])
 				if err != nil {
@@ -301,13 +301,13 @@ func (b *Block) VerifyFraudProof(fp FraudProof) bool {
 	//fmt.Println(len(fp.writeKeys), fp.writeKeys)
 
 	// 3. check keys-values contained in the transaction are in the state tree for old data
-	subtree := smt.NewDeepSparseMerkleSubTree(smt.NewSimpleMap(), sha512.New512_256())
+	subtree := smt.NewDeepSparseMerkleSubTree(smt.NewSimpleMap(), sha512.New512_256(), b.stateRoot)
 	for i := 0; i < len(fp.writeKeys); i++ {
 		proof, err := smt.DecompactProof(fp.proofState[i], sha512.New512_256())
 		if err != nil {
 			return false
 		}
-		subtree.AddBranches(proof, fp.writeKeys[i],fp.oldData[i], true)
+		subtree.AddBranch(proof, fp.writeKeys[i],fp.oldData[i])
 		// 4. update keys with new data
 		subtree.Update(fp.writeKeys[i], newData[i])
 	}
@@ -317,5 +317,3 @@ func (b *Block) VerifyFraudProof(fp FraudProof) bool {
 
 	return true
 }
-
-
