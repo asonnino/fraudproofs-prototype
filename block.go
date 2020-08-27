@@ -9,6 +9,7 @@ import (
 	//"github.com/minio/sha256-simd"
 	"crypto/sha512"
 	"github.com/musalbas/smt"
+	//"fmt"
 )
 
 // Step defines the interval on which to compute intermediate state roots (must be a positive integer)
@@ -188,7 +189,6 @@ func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error)
 				return nil, err
 			}
 			var concernedChunks [][]byte
-			//fmt.Println(chunksIndexes)
 			for j := 0; j < len(chunksIndexes); j++ {
 				concernedChunks = append(concernedChunks, chunks[chunksIndexes[j]])
 			}
