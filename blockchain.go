@@ -2,8 +2,6 @@ package fraudproofs
 
 import (
 	"github.com/musalbas/smt"
-	//"crypto/sha256"
-	//"github.com/minio/sha256-simd"
 	"crypto/sha512"
 )
 

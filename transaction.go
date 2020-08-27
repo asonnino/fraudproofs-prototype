@@ -3,8 +3,6 @@ package fraudproofs
 import (
 	"encoding/binary"
 	"errors"
-	//"crypto/sha256"
-	//"github.com/minio/sha256-simd"
 	"crypto/sha512"
 )
 
@@ -127,4 +125,3 @@ func Deserialize(buff []byte) (*Transaction, error) {
 
 	return NewTransaction(writeKeys, newData, oldData, readKeys, readData, []byte{})
 }
-
