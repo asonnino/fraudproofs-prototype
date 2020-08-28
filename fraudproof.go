@@ -2,7 +2,7 @@
 package fraudproofs
 
 import (
-	"github.com/musalbas/smt"
+	"github.com/lazyledger/smt"
 )
 
 // FraudProof is a fraud proof.

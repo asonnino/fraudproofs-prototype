@@ -6,7 +6,7 @@ import (
 	"errors"
 	"github.com/NebulousLabs/merkletree"
 	"crypto/sha512"
-	"github.com/musalbas/smt"
+	"github.com/lazyledger/smt"
 )
 
 // Step defines the interval on which to compute intermediate state roots (must be a positive integer)
@@ -62,7 +62,6 @@ func fillStateTree(t []Transaction, stateTree *smt.SparseMerkleTree) ([][]byte, 
 	var stateRoot []byte
 	var interStateRoots [][]byte
 	for i := 0; i < len(t); i++ {
-		//fmt.Println("transaction size: ", len(t[i].Serialize()))
 		for j := 0; j < len(t[i].writeKeys); j++ {
 			root, err := stateTree.Update(t[i].writeKeys[j], t[i].newData[j])
 			if err != nil {
@@ -237,7 +236,6 @@ func (b *Block) getChunksIndexes(t []Transaction) ([]uint64, uint64, error) {
 	var chunksIndexes []uint64
 	for i := 0; i < len(t); i++ {
 		index := uint64(buffMap[t[i].HashKey()]/chunksSize)
-		//chunksIndexes = append(chunksIndexes, index)
 		length := int(binary.LittleEndian.Uint16(t[i].Serialize()[:MaxSize]))
 		last := length/chunksSize
 		for j := 0; j <= last; j++ {
@@ -297,11 +295,17 @@ func (b *Block) VerifyFraudProof(fp FraudProof) bool {
 		if err != nil {
 			return false
 		}
-		subtree.AddBranch(proof, fp.writeKeys[i],fp.oldData[i])
+		err = subtree.AddBranch(proof, fp.writeKeys[i], newData[i])
+		if err != nil {
+			return false
+		}
 		// 4. update keys with new data
-		subtree.Update(fp.writeKeys[i], newData[i])
+		_, err = subtree.Update(fp.writeKeys[i], newData[i])
+		if err != nil {
+			return false
+		}
 	}
-	if bytes.Compare(b.stateRoot, subtree.Root()) != 0 {
+	if !bytes.Equal(b.stateRoot, subtree.Root()) {
 		return false
 	}
 

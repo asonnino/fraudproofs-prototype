@@ -1,7 +1,7 @@
 package fraudproofs
 
 import (
-	"github.com/musalbas/smt"
+	"github.com/lazyledger/smt"
 	"crypto/sha512"
 )
 
