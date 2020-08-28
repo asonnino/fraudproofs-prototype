@@ -5,40 +5,11 @@ import (
 	"crypto/sha512"
 	"fmt"
 	"github.com/NebulousLabs/merkletree"
-	//"github.com/jinzhu/copier"
 	"github.com/lazyledger/smt"
 	"math/rand"
 	"testing"
 	"time"
 )
-
-func TestTemp(test *testing.T) {
-	tree := smt.NewSparseMerkleTree(smt.NewSimpleMap(), sha512.New512_256())
-
-	tree.Update([]byte("testKey1"), []byte("testValue1"))
-	tree.Update([]byte("testKey2"), []byte("testValue2"))
-	tree.Update([]byte("testKey3"), []byte("testValue3"))
-	tree.Update([]byte("testKey4"), []byte("testValue4"))
-	tree.Update([]byte("testKey6"), []byte("testValue6"))
-
-	var originalRoot []byte
-	copy(originalRoot, tree.Root())
-
-	proof, _ := tree.ProveCompact([]byte("testKey1"))
-	//proof2, _ := tree.Prove([]byte("testKey2"))
-	//proof5, _ := tree.Prove([]byte("testKey5"))
-
-	dsmst := smt.NewDeepSparseMerkleSubTree(smt.NewSimpleMap(), sha512.New512_256(), tree.Root())
-	decompactProof, err := smt.DecompactProof(proof, sha512.New512_256())
-	if err != nil {
-		test.Errorf("Fail to decompact proof: %v", err)
-	}
-	err = dsmst.AddBranch(decompactProof, []byte("testKey1"), []byte("testValue1"))
-	if err != nil {
-		test.Errorf("returned error when adding branch to deep subtree: %v", err)
-	}
-}
-
 
 func TestTransaction(test *testing.T) {
 	// create good transaction
