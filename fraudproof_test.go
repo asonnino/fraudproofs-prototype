@@ -4,118 +4,121 @@ import (
 	"bytes"
 	"crypto/sha512"
 	"fmt"
-	"github.com/NebulousLabs/merkletree"
-	"github.com/lazyledger/smt"
 	"math/rand"
 	"testing"
 	"time"
+
+	"github.com/NebulousLabs/merkletree"
+	"github.com/lazyledger/smt"
 )
 
-func TestTransaction(test *testing.T) {
+func TestTransaction(t *testing.T) {
 	// create good transaction
-	_, err :=  NewTransaction(generateCorruptedTransactionInput())
+	_, err := NewTransaction(generateCorruptedTransactionInput())
 	if err == nil {
-		test.Error("should return an error")
+		t.Error("should return an error")
 	}
 
 	// create bad transaction
-	goodT, err :=  NewTransaction(generateTransactionInput())
+	goodTx, err := NewTransaction(generateTransactionInput())
 	if err != nil {
-		test.Error(err)
+		t.Error(err)
 	}
 
 	// serialize and deserialize
-	buff := goodT.Serialize()
-	t, err := Deserialize(buff)
+	buff := goodTx.Serialize()
+	tx, err := Deserialize(buff)
 	if err != nil {
-		test.Error(err)
-	} else if bytes.Compare(t.Serialize(), buff) != 0 {
-		test.Error("transaction not serialized and deserialize correctly")
+		t.Error(err)
+	} else if bytes.Compare(tx.Serialize(), buff) != 0 {
+		t.Error("transaction not serialized and deserialize correctly")
 	}
 }
 
-
-func TestBlock(test *testing.T) {
+func TestBlock(t *testing.T) {
 	// create bad block (corrupted transactions)
-	_, err :=  NewBlock(generateCorruptedBlockInput())
+	_, err := NewBlock(generateCorruptedBlockInput())
 	if err == nil {
-		test.Error("should return an error")
+		t.Error("should return an error")
 	}
 
 	// create good block
 	goodTransaction, stateTree := generateBlockInput(1000000)
-	goodBlock, err :=  NewBlock(goodTransaction, stateTree)
+	goodBlock, err := NewBlock(goodTransaction, stateTree)
 	if err != nil {
-		test.Error(err)
+		t.Error(err)
 	}
 
 	// check good block
 	_, err = goodBlock.CheckBlock(stateTree)
 	if err != nil {
-		test.Error(err)
+		t.Error(err)
 	}
 
 	// check a bad block (corrupted transactions)
 	badBlock := generateBlockWithCorruptedTransactions()
 	_, err = badBlock.CheckBlock(stateTree)
 	if err == nil {
-		test.Error("should return an error")
+		t.Error("should return an error")
 	}
 
 	// check bad block (corrupted intermediate state)
 	badBlock = corruptBlockInterStates(goodBlock)
 	goodFp, err := badBlock.CheckBlock(stateTree)
 	if err != nil {
-		test.Error(err)
+		t.Error(err)
 	} else if goodFp == nil {
-		test.Error("should return a fraud proof")
+		t.Error("should return a fraud proof")
 	}
 
 	// verify fraud proof of bad block
 	ret := badBlock.VerifyFraudProof(*goodFp)
 	if ret != true {
-		test.Error("fraud proof does not check")
+		t.Error("fraud proof does not check")
 	}
 
 	// verify corrupted fraud proof (corrupted chunks proof)
 	corruptedFp := corruptFraudproofChunks(goodFp)
 	ret = badBlock.VerifyFraudProof(*corruptedFp)
 	if ret != false {
-		test.Error("invalid fraud proof should not check")
+		t.Error("invalid fraud proof should not check")
 	}
 
 	// verify corrupted fraud proof (corrupted state proof)
 	corruptedFp = corruptFraudproofState(goodFp)
 	ret = badBlock.VerifyFraudProof(*corruptedFp)
 	if ret != false {
-		test.Error("invalid fraud proof should not check")
+		t.Error("invalid fraud proof should not check")
 	}
 }
 
-func TestBlockchain(test *testing.T) {
+func TestBlockchain(t *testing.T) {
 	// add good blocks to blockchain
 	blockchain := NewBlockchain()
 	goodBlock, _ := NewBlock(generateBlockInput(1000000))
-	blockchain.Append(goodBlock) // add a first block
+	_, err := blockchain.Append(goodBlock) // add a first block
+	if err != nil {
+		t.Error(err)
+	}
 	fp, err := blockchain.Append(goodBlock) // add a second block
 	if err != nil {
-		test.Error(err)
+		t.Error(err)
 	} else if fp != nil {
-		test.Error("should not return a fraud proof")
+		t.Error("should not return a fraud proof")
 	}
 
 	// add bad block to blockchain (corrupted intermediate state)
 	fp, err = blockchain.Append(corruptBlockInterStates(goodBlock))
 	if err != nil {
-		test.Error(err)
+		t.Error(err)
 	} else if fp == nil {
-		test.Error("should return a fraud proof")
+		t.Error("should return a fraud proof")
 	}
 
 	// add bad block to blockchain (corrupted transactions)
 	_, err = blockchain.Append(generateBlockWithCorruptedTransactions())
 	if err == nil {
-		test.Error("should return an error")
+		t.Error("should return an error")
 	}
 }
 
@@ -127,7 +130,7 @@ func TestTiming(test *testing.T) {
 
 	// create good block
 	goodTransaction, stateTree := generateBlockInput(blockSize)
-	goodBlock, err :=  NewBlock(goodTransaction, stateTree)
+	goodBlock, err := NewBlock(goodTransaction, stateTree)
 	if err != nil {
 		test.Error(err)
 	}
@@ -145,7 +148,7 @@ func TestTiming(test *testing.T) {
 	}
 	t := time.Now()
 	elapsed := t.Sub(start)
-	fmt.Println("generate proof (average): ", int64(elapsed / time.Millisecond) / int64(runs), "ms")
+	fmt.Println("generate proof (average): ", int64(elapsed/time.Millisecond)/int64(runs), "ms")
 
 	// verify fraud proof of bad block
 	goodFp, err := goodBlock.CheckBlock(stateTree)
@@ -158,14 +161,12 @@ func TestTiming(test *testing.T) {
 	}
 	t = time.Now()
 	elapsed = t.Sub(start)
-	fmt.Println("verify proof (average): ", int64(elapsed / time.Microsecond) / int64(runs), "us")
+	fmt.Println("verify proof (average): ", int64(elapsed/time.Microsecond)/int64(runs), "us")
 }
-
 
 // ------------------ helpers ------------------ //
 
-
-func generateTransactionInput() ([][]byte, [][]byte, [][]byte, [][]byte, [][]byte, []byte) {
+func generateTransactionInput() ([][]byte, [][]byte, [][]byte, [][]byte, [][]byte) {
 	var writeKeys, newData, oldData, readKeys, readData [][]byte
 
 	// average Ethereum transaction size (225B)
@@ -215,16 +216,16 @@ func generateTransactionInput() ([][]byte, [][]byte, [][]byte, [][]byte, [][]byt
 		readData = append(readData, token)
 	}
 
-	return writeKeys, newData, oldData, readKeys, readData, []byte{}
+	return writeKeys, newData, oldData, readKeys, readData
 }
 
-func generateCorruptedTransactionInput() ([][]byte, [][]byte, [][]byte, [][]byte, [][]byte, []byte) {
-	writeKeys, newData, oldData, readKeys, readData, arbitrary := generateTransactionInput()
+func generateCorruptedTransactionInput() ([][]byte, [][]byte, [][]byte, [][]byte, [][]byte) {
+	writeKeys, newData, oldData, readKeys, readData := generateTransactionInput()
 	writeKeys = writeKeys[1:]
-	return writeKeys, newData, oldData, readKeys, readData, arbitrary
+	return writeKeys, newData, oldData, readKeys, readData
 }
 
-func corruptTransaction(t *Transaction) (*Transaction) {
+func corruptTransaction(t *Transaction) *Transaction {
 	t.writeKeys = t.writeKeys[1:]
 	return t
 }
@@ -248,17 +249,17 @@ func generateCorruptedBlockInput() ([]Transaction, *smt.SparseMerkleTree) {
 	t1 = corruptTransaction(t1)
 
 	stateTree := smt.NewSparseMerkleTree(smt.NewSimpleMap(), sha512.New512_256())
-	return []Transaction{*t1,*t2}, stateTree
+	return []Transaction{*t1, *t2}, stateTree
 }
 
-func generateBlockWithCorruptedTransactions() (*Block) {
+func generateBlockWithCorruptedTransactions() *Block {
 	block, _ := NewBlock(generateBlockInput(1000000))
 	t := block.transactions[0]
 	block.transactions[0] = *corruptTransaction(&t)
 	return block
 }
 
-func corruptBlockInterStates(b *Block) (*Block) {
+func corruptBlockInterStates(b *Block) *Block {
 	h := sha512.New512_256()
 	h.Write([]byte("random"))
 	b.interStateRoots[0] = h.Sum(nil)
@@ -275,16 +276,16 @@ func corruptBlockInterStates(b *Block) (*Block) {
 		b.interStateRoots}
 }
 
-func corruptFraudproofChunks(fp *FraudProof) (*FraudProof) {
-	copyFp := copyFraudproof(fp)
+func corruptFraudproofChunks(fp *FraudProof) *FraudProof {
+	copyFp := copyFraudProof(fp)
 	h := sha512.New512_256()
 	h.Write([]byte("random"))
 	copyFp.proofChunks[0] = [][]byte{h.Sum(nil), h.Sum(nil)}
 	return copyFp
 }
 
-func corruptFraudproofState(fp *FraudProof) (*FraudProof) {
-	copyFp := copyFraudproof(fp)
+func corruptFraudproofState(fp *FraudProof) *FraudProof {
+	copyFp := copyFraudProof(fp)
 	h := sha512.New512_256()
 	h.Write([]byte("random"))
 	copyFp.writeKeys[0] = h.Sum(nil)
@@ -292,17 +293,17 @@ func corruptFraudproofState(fp *FraudProof) (*FraudProof) {
 }
 
 // I didn't manage to make a deep copier work (.eg github.com/jinzhu/copier)
-func copyFraudproof(fp *FraudProof) (*FraudProof) {
+func copyFraudProof(fp *FraudProof) *FraudProof {
 	copyFp := &FraudProof{
-		make([][]byte, len(fp.writeKeys)), //writeKeys
-		make([][]byte, len(fp.oldData)), //oldData
-		make([][]byte, len(fp.readKeys)), //readKeys
-		make([][]byte, len(fp.readData)), //readData
+		make([][]byte, len(fp.writeKeys)),                        //writeKeys
+		make([][]byte, len(fp.oldData)),                          //oldData
+		make([][]byte, len(fp.readKeys)),                         //readKeys
+		make([][]byte, len(fp.readData)),                         //readData
 		make([]smt.SparseCompactMerkleProof, len(fp.proofState)), //proofState
-		make([][]byte, len(fp.chunks)), // chunks
-		make([][][]byte, len(fp.proofChunks)), //proofChunks
-		make([]uint64, len(fp.chunksIndexes)), // chunksIndexes
-		fp.numOfLeaves, // numOfLeaves
+		make([][]byte, len(fp.chunks)),                           // chunks
+		make([][][]byte, len(fp.proofChunks)),                    //proofChunks
+		make([]uint64, len(fp.chunksIndexes)),                    // chunksIndexes
+		fp.numOfLeaves,                                           // numOfLeaves
 	}
 
 	copy(copyFp.writeKeys, fp.writeKeys)

@@ -2,29 +2,31 @@ package fraudproofs
 
 import (
 	"bytes"
+	"crypto/sha512"
 	"encoding/binary"
 	"errors"
+
 	"github.com/NebulousLabs/merkletree"
-	"crypto/sha512"
 	"github.com/lazyledger/smt"
 )
 
 // Step defines the interval on which to compute intermediate state roots (must be a positive integer)
 const Step int = 2
+
 // ChunksSize defines the size of each chunk
 const chunksSize int = 256
 
 // Block is a block of the blockchain
 type Block struct {
-    // data structure
-    dataRoot     []byte
-    stateRoot    []byte
-    transactions []Transaction
+	// data structure
+	dataRoot     []byte
+	stateRoot    []byte
+	transactions []Transaction
 
-    // implementation specific
-    prev            *Block // link to the previous block
-    dataTree        *merkletree.Tree // Merkle tree storing chunks
-    interStateRoots [][]byte // intermediate state roots (saved every 'step' transactions)
+	// implementation specific
+	prev            *Block           // link to the previous block
+	dataTree        *merkletree.Tree // Merkle tree storing chunks
+	interStateRoots [][]byte         // intermediate state roots (saved every 'step' transactions)
 }
 
 // NewBlock creates a new block with the given transactions.
@@ -47,18 +49,18 @@ func NewBlock(t []Transaction, stateTree *smt.SparseMerkleTree) (*Block, error) 
 		return nil, err
 	}
 
-    return &Block{
-        dataRoot,
-        stateRoot,
+	return &Block{
+		dataRoot,
+		stateRoot,
 		t,
-        nil,
+		nil,
 		dataTree,
 		interStateRoots}, nil
 }
 
 // fillStateTree fills the input state tree with key-values from the input transactions, and returns the state root and
 // the intermediate state roots.
-func fillStateTree(t []Transaction, stateTree *smt.SparseMerkleTree) ([][]byte, []byte, error){
+func fillStateTree(t []Transaction, stateTree *smt.SparseMerkleTree) ([][]byte, []byte, error) {
 	var stateRoot []byte
 	var interStateRoots [][]byte
 	for i := 0; i < len(t); i++ {
@@ -71,7 +73,7 @@ func fillStateTree(t []Transaction, stateTree *smt.SparseMerkleTree) ([][]byte, 
 			copy(stateRoot, root)
 		}
 
-		if i != 0 && i % Step == 0 {
+		if i != 0 && i%Step == 0 {
 			interStateRoots = append(interStateRoots, stateRoot)
 		}
 	}
@@ -130,7 +132,7 @@ func makeChunks(chunkSize int, t []Transaction, s [][]byte) ([][]byte, map[[256]
 		chunks = append(chunks, chunk)
 	}
 
-	for i := len(t)-1; i >= 0; i-- {
+	for i := len(t) - 1; i >= 0; i-- {
 		chunkIndex := buffMap[t[i].HashKey()] / chunksSize
 		chunkPosition := byte(buffMap[t[i].HashKey()] % chunksSize)
 		chunks[chunkIndex][0] = chunkPosition
@@ -150,18 +152,18 @@ func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error)
 	for i := 0; i < len(rebuiltBlock.interStateRoots); i++ {
 		if len(b.interStateRoots) <= i || !bytes.Equal(rebuiltBlock.interStateRoots[i], b.interStateRoots[i]) {
 			// 1. get the transactions causing the (first) invalid intermediate state
-			t := rebuiltBlock.transactions[i*Step:(i+1)*Step]
+			tx := rebuiltBlock.transactions[i*Step : (i+1)*Step]
 
 			// 2. generate Merkle proofs of the keys-values contained in the transaction
 			var writeKeys, oldData, readKeys, readData [][]byte
-			for j := 0; j < len(t); j++ {
-				for k := 0; k < len(t[j].writeKeys); k++ {
-					writeKeys = append(writeKeys, t[j].writeKeys[k])
-					oldData = append(oldData, t[j].oldData[k])
+			for j := 0; j < len(tx); j++ {
+				for k := 0; k < len(tx[j].writeKeys); k++ {
+					writeKeys = append(writeKeys, tx[j].writeKeys[k])
+					oldData = append(oldData, tx[j].oldData[k])
 				}
-				for k := 0; k < len(t[j].readKeys); k++ {
-					readKeys = append(readKeys, t[j].readKeys[k])
-					readData = append(readData, t[j].readData[k])
+				for k := 0; k < len(tx[j].readKeys); k++ {
+					readKeys = append(readKeys, tx[j].readKeys[k])
+					readData = append(readData, tx[j].readData[k])
 				}
 			}
 
@@ -176,7 +178,7 @@ func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error)
 
 			// 3. get chunks concerned by the proof
 			// TODO compact 'makeChunks' and 'getChunksIndexes'
-			chunksIndexes, _, err := b.getChunksIndexes(t)
+			chunksIndexes, _, err := b.getChunksIndexes(tx)
 			if err != nil {
 				return nil, err
 			}
@@ -222,7 +224,6 @@ func (b *Block) CheckBlock(stateTree *smt.SparseMerkleTree) (*FraudProof, error)
 		}
 	}
 
-
 	return nil, nil
 }
 
@@ -235,11 +236,11 @@ func (b *Block) getChunksIndexes(t []Transaction) ([]uint64, uint64, error) {
 
 	var chunksIndexes []uint64
 	for i := 0; i < len(t); i++ {
-		index := uint64(buffMap[t[i].HashKey()]/chunksSize)
+		index := uint64(buffMap[t[i].HashKey()] / chunksSize)
 		length := int(binary.LittleEndian.Uint16(t[i].Serialize()[:MaxSize]))
-		last := length/chunksSize
+		last := length / chunksSize
 		for j := 0; j <= last; j++ {
-			chunksIndexes = append(chunksIndexes, index + uint64(j))
+			chunksIndexes = append(chunksIndexes, index+uint64(j))
 		}
 		if length > (chunksSize - buffMap[t[i].HashKey()]%chunksSize) {
 			chunksIndexes = append(chunksIndexes, index+uint64(last)+1) // ugly fix
