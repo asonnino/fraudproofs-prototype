@@ -1,9 +1,9 @@
 package fraudproofs
 
 import (
+	"crypto/sha512"
 	"encoding/binary"
 	"errors"
-	"crypto/sha512"
 )
 
 // MaxSize is the number of bytes dedicated to store the size of the transaction's fields.
@@ -14,17 +14,18 @@ const MaxSize int = 2
 // It is designed only for testing & benchmarking as it is implemented very naively.
 type Transaction struct {
 	writeKeys [][]byte
-	newData [][]byte
-	oldData [][]byte
-	readKeys [][]byte
-	readData [][]byte
-	arbitrary []byte
+	oldData   [][]byte
+	newData   [][]byte
+	readKeys  [][]byte
+	readData  [][]byte
+	// TODO: re-enable possibility to add in arbitrary data:
+	// arbitrary []byte
 }
 
 // NewTransaction creates a new transaction with the given keys and data.
-func NewTransaction(writeKeys, newData, oldData, readKeys, readData [][]byte, arbitrary []byte) (*Transaction, error) {
+func NewTransaction(writeKeys, newData, oldData, readKeys, readData [][]byte) (*Transaction, error) {
 	t := &Transaction{
-		writeKeys,newData,oldData,readKeys,readData,arbitrary}
+		writeKeys, oldData, newData, readKeys, readData}
 	err := t.CheckTransaction()
 	if err != nil {
 		return nil, err
@@ -33,13 +34,12 @@ func NewTransaction(writeKeys, newData, oldData, readKeys, readData [][]byte, ar
 }
 
 // CheckTransaction verifies whether a transaction is well-formed.
-func (t *Transaction) CheckTransaction() (error) {
+func (t *Transaction) CheckTransaction() error {
 	if len(t.writeKeys) != len(t.newData) || len(t.writeKeys) != len(t.oldData) || len(t.readKeys) != len(t.readData) {
 		return errors.New("number of keys does not match the number of data")
 	}
-	if len(t.writeKeys) != len(t.readKeys) || len(t.arbitrary) != 0{
-		return errors.New("number of writeKeys should be equal to number of readKeys, and arbitrary data should" +
-			"be empty; sorry for that (lazy implementation)")
+	if len(t.writeKeys) != len(t.readKeys) {
+		return errors.New("number of writeKeys should be equal to number of readKeys")
 	}
 
 	return nil
@@ -123,5 +123,5 @@ func Deserialize(buff []byte) (*Transaction, error) {
 		readData, tmp = append(readData, tmp[:size]), tmp[size:]
 	}
 
-	return NewTransaction(writeKeys, newData, oldData, readKeys, readData, []byte{})
+	return NewTransaction(writeKeys, newData, oldData, readKeys, readData)
 }
